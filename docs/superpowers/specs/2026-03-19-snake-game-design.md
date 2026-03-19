@@ -106,13 +106,15 @@ HomePage → SnakeModePage → ClassicGame / AdaptiveGame / FreeGame
 - Snake moves one cell per tick (200ms = 5 cells/second)
 - Input is buffered: pressing a direction queues it for the next tick
 - Cannot reverse direction (e.g., moving right, pressing left is ignored)
-- Adaptive mode: grid calculated once at game start, not recalculated on resize
+- Classic mode: 20×20 grid, cells stretch to fill available play area as a square (centered, using min(width, height) to maintain 1:1 aspect ratio)
+- Adaptive mode: fixed 20px cell size, grid calculated once at game start, not recalculated on resize
 - Adaptive mode: play area = screen minus top bar and score bar, cell count = floor(available width / 20px) × floor(available height / 20px), remaining pixels become symmetric padding
 - Adaptive mode: maximum grid cap of 40×40 to prevent excessively large play areas
+- Grid background: subtle grid lines (#1e2a4a, 1px) to show cell boundaries
 
 ### Free Mode Details
 
-- **Movement speed**: 120 pixels per second
+- **Movement speed**: 120 pixels per second (delta-time based for frame-rate independence)
 - **Turn rate**: 180°/second (hold left/right to turn continuously)
 - **Segment radius**: 8px (circular segments)
 - **Segment spacing**: 18px center-to-center along the movement path
@@ -170,8 +172,8 @@ lib/
 │   │   ├── free_game.dart             # Free mode FlameGame
 │   │   └── free_snake.dart            # Path-based smooth snake component
 │   └── components/
-│       ├── food_component.dart        # Food spawning and rendering
-│       └── grid_background.dart       # Grid background rendering (Classic/Adaptive only)
+│       ├── food_component.dart        # Food spawning and rendering (grid-based collision for Classic/Adaptive, radius-based for Free)
+│       └── grid_background.dart       # Grid line rendering (Classic/Adaptive only, #1e2a4a 1px lines)
 ```
 
 ### Design principles
