@@ -14,15 +14,17 @@ A Flutter mini-game collection app built with the Flame engine. 18 games organiz
 ## Tech Stack
 
 - **Flutter 3.41.5** (pinned via FVM)
-- **Flame engine** — unified game engine for all games
-- **Forge2D** — physics engine (for games that need it, e.g., Draw Physics, Breakout)
+- **Flame engine** — unified game engine for all games (added to pubspec.yaml when first game is implemented)
+- **Forge2D** — physics engine (added when needed, e.g., Draw Physics, Breakout)
+- **shared_preferences** — local persistence for view toggle preference and high scores
 
 ## Art Strategy
 
 | Phase | Approach |
 |-------|----------|
-| Phase 1-2, 4 | Geometric shapes + color schemes (zero art dependency) |
+| Phase 1-2 | Geometric shapes + color schemes (zero art dependency) |
 | Phase 3 | Geometric + simple sprites / Kenney free assets |
+| Phase 4 | Geometric shapes (algorithm-focused games, no art needed) |
 | Phase 5 | Geometric + particle effects + AI-generated art |
 | Phase 6 | Kenney asset packs + AI-generated art |
 
@@ -86,9 +88,9 @@ Art sources:
 
 | # | Game | Key Learning | Description |
 |---|------|-------------|-------------|
-| 13 | Doodle Jump | Infinite vertical scroll, gyroscope, random platforms | A character bounces upward on platforms. Tilt device to move left/right. Don't fall. |
+| 13 | Doodle Jump | Infinite vertical scroll, gyroscope/keyboard, random platforms | A character bounces upward on platforms. Tilt device (Android) or arrow keys (Web) to move. Don't fall. |
 | 14 | Draw Physics | Free drawing, Forge2D physics engine | Draw lines on screen that become physical objects. Guide a ball to the goal. |
-| 15 | Rhythm Game | Audio sync, beat detection, chart system | Notes fall from above — tap in rhythm to score. Miss and your combo breaks. |
+| 15 | Rhythm Game | Audio sync, beat detection, chart system | Notes fall from above — tap in rhythm to score. Miss and your combo breaks. Note: web audio latency may affect precision; Android is the primary platform for this game. |
 
 ### Phase 6: Push the Limits (Kenney/AI Assets)
 
@@ -108,7 +110,9 @@ Art sources:
 
 ## Shared Infrastructure
 
-Each game is a separate page/route within the single Flutter app. Shared components:
+Each game is a separate page/route within the single Flutter app. Each game manages its own state internally; shared_preferences handles persistence (scores, settings).
+
+Shared components:
 
 - **Home page** — game list with grid/list toggle
 - **Game scaffold** — common wrapper (back button, pause, score display)
