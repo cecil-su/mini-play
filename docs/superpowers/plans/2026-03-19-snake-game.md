@@ -31,7 +31,7 @@
 | `lib/snake/classic/classic_snake.dart` | Create | Grid-based snake component |
 | `lib/snake/classic/classic_game.dart` | Create | Classic mode FlameGame |
 | `lib/snake/classic/classic_game_page.dart` | Create | Classic mode page wrapper (StatefulWidget) |
-| `lib/snake/adaptive/adaptive_snake.dart` | Create | Adaptive grid snake component |
+| `lib/snake/adaptive/adaptive_snake.dart` | Skip | Not needed — reuses ClassicSnake with different grid params |
 | `lib/snake/adaptive/adaptive_game.dart` | Create | Adaptive mode FlameGame |
 | `lib/snake/adaptive/adaptive_game_page.dart` | Create | Adaptive mode page wrapper |
 | `lib/snake/free/free_snake.dart` | Create | Path-based smooth snake component |
@@ -445,7 +445,7 @@ A StatelessWidget page:
 - Stats grid: 2x2 grid of stat cards, each with label (grey) and value (white/colored)
 - "Play Again" button (#4ECCA3) → calls `Navigator.pop(context)` to return to the game page, then invokes `data.replayCallback`. The `replayCallback` is a closure created by the game page (e.g., `ClassicGamePage`) before pushing GameOverPage: `replayCallback: () { setState(() { _gameKey = UniqueKey(); }); }`. The game page holds a `_gameKey` used as the `key` parameter on `GameWidget` — changing the key forces Flutter to dispose and recreate the widget, creating a fresh FlameGame instance.
 - "Home" button (#333) → `Navigator.popUntil(context, ModalRoute.withName('/'))`
-- Before displaying, call `ScoreService().saveHighScore(data.gameName, data.mode, score)`
+- High score is already saved by the game page before pushing GameOverPage — GameOverPage is pure display, no save logic
 
 - [ ] **Step 3: Verify scaffold renders with a test game**
 
@@ -635,7 +635,6 @@ class GridFood extends FoodComponent<Point<int>> {
       gridOffset.x + gridX * cellSize,
       gridOffset.y + gridY * cellSize,
     );
-    size = Vector2.all(cellSize);
   }
 
   @override
@@ -786,7 +785,7 @@ class ClassicGame extends FlameGame with KeyboardEvents {
     await add(food);
     await add(snake);
 
-    food.spawnInitial(snake.body.first.x, snake.body.first.y);
+    food.spawnInitial(snake.occupiedCells);
   }
 
   @override
