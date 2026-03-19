@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'home/home_page.dart';
 import 'snake/adaptive/adaptive_game_page.dart';
 import 'snake/classic/classic_game_page.dart';
+import 'snake/free/free_game_page.dart';
 import 'snake/snake_mode_page.dart';
 
 void main() {
@@ -56,9 +57,7 @@ class MiniPlayApp extends StatelessWidget {
           case '/snake/free':
             return MaterialPageRoute(
               settings: settings,
-              builder: (_) => const Scaffold(
-                body: Center(child: Text('Game - Coming Soon')),
-              ),
+              builder: (_) => const FreeGamePage(),
             );
           default:
             return MaterialPageRoute(
