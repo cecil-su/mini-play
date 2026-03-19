@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home/home_page.dart';
+import 'snake/snake_mode_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,11 +39,7 @@ class MiniPlayApp extends StatelessWidget {
           case '/snake':
             return MaterialPageRoute(
               settings: settings,
-              builder: (_) => const Scaffold(
-                body: Center(
-                  child: Text('Snake Mode Selection - Coming Soon'),
-                ),
-              ),
+              builder: (_) => const SnakeModePage(),
             );
           case '/snake/classic':
           case '/snake/adaptive':
