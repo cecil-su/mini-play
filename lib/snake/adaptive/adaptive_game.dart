@@ -7,7 +7,7 @@ import '../components/food_component.dart';
 import '../components/grid_background.dart';
 import '../classic/classic_snake.dart';
 
-class AdaptiveGame extends FlameGame with KeyboardEvents {
+class AdaptiveGame extends FlameGame with KeyboardEvents, PanDetector {
   final ValueNotifier<int> scoreNotifier = ValueNotifier(0);
   final void Function(Map<String, String> stats) onGameOver;
   bool isPaused = false;
@@ -19,6 +19,10 @@ class AdaptiveGame extends FlameGame with KeyboardEvents {
   late ClassicSnake snake;
   late GridFood food;
   double gameTime = 0;
+
+  // Swipe detection state
+  Vector2? _dragStart;
+  bool _swipeFired = false;
 
   AdaptiveGame({required this.onGameOver});
 
@@ -103,6 +107,37 @@ class AdaptiveGame extends FlameGame with KeyboardEvents {
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  @override
+  void onPanStart(DragStartInfo info) {
+    _dragStart = info.eventPosition.global;
+    _swipeFired = false;
+  }
+
+  @override
+  void onPanUpdate(DragUpdateInfo info) {
+    if (_swipeFired || _dragStart == null) return;
+    if (isPaused || snake.isDead) return;
+
+    final current = info.eventPosition.global;
+    final delta = current - _dragStart!;
+    if (delta.length < 20) return;
+
+    Direction dir;
+    if (delta.x.abs() > delta.y.abs()) {
+      dir = delta.x > 0 ? Direction.right : Direction.left;
+    } else {
+      dir = delta.y > 0 ? Direction.down : Direction.up;
+    }
+    snake.changeDirection(dir);
+    _swipeFired = true;
+  }
+
+  @override
+  void onPanEnd(DragEndInfo info) {
+    _dragStart = null;
+    _swipeFired = false;
   }
 
   void _handleDeath() {

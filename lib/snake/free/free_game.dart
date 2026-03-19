@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../components/food_component.dart';
 import 'free_snake.dart';
 
-class FreeGame extends FlameGame with KeyboardEvents {
+class FreeGame extends FlameGame with KeyboardEvents, MultiTouchTapDetector {
   final ValueNotifier<int> scoreNotifier = ValueNotifier(0);
   final void Function(Map<String, String> stats) onGameOver;
   bool isPaused = false;
@@ -92,6 +92,23 @@ class FreeGame extends FlameGame with KeyboardEvents {
       }
     }
     return KeyEventResult.ignored;
+  }
+
+  @override
+  void onTapDown(int pointerId, TapDownInfo info) {
+    if (isPaused || snake.isDead) return;
+    final touchX = info.eventPosition.widget.x;
+    snake.steer(touchX < size.x / 2 ? -1 : 1);
+  }
+
+  @override
+  void onTapUp(int pointerId, TapUpInfo info) {
+    snake.steer(0);
+  }
+
+  @override
+  void onTapCancel(int pointerId) {
+    snake.steer(0);
   }
 
   void _handleDeath() {
