@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home/home_page.dart';
+import 'snake/classic/classic_game_page.dart';
 import 'snake/snake_mode_page.dart';
 
 void main() {
@@ -42,6 +43,10 @@ class MiniPlayApp extends StatelessWidget {
               builder: (_) => const SnakeModePage(),
             );
           case '/snake/classic':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const ClassicGamePage(),
+            );
           case '/snake/adaptive':
           case '/snake/free':
             return MaterialPageRoute(
