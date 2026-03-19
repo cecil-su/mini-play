@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'home/home_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,12 +29,36 @@ class MiniPlayApp extends StatelessWidget {
       ),
       initialRoute: '/',
       onGenerateRoute: (settings) {
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => const Scaffold(
-            body: Center(child: Text('Mini Play - Coming Soon')),
-          ),
-        );
+        switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const HomePage(),
+            );
+          case '/snake':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const Scaffold(
+                body: Center(
+                  child: Text('Snake Mode Selection - Coming Soon'),
+                ),
+              ),
+            );
+          case '/snake/classic':
+          case '/snake/adaptive':
+          case '/snake/free':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const Scaffold(
+                body: Center(child: Text('Game - Coming Soon')),
+              ),
+            );
+          default:
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const HomePage(),
+            );
+        }
       },
     );
   }
