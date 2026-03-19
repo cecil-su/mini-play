@@ -30,10 +30,13 @@
 | `lib/snake/components/food_component.dart` | Create | Abstract food base + GridFood + FreeFood |
 | `lib/snake/classic/classic_snake.dart` | Create | Grid-based snake component |
 | `lib/snake/classic/classic_game.dart` | Create | Classic mode FlameGame |
+| `lib/snake/classic/classic_game_page.dart` | Create | Classic mode page wrapper (StatefulWidget) |
 | `lib/snake/adaptive/adaptive_snake.dart` | Create | Adaptive grid snake component |
 | `lib/snake/adaptive/adaptive_game.dart` | Create | Adaptive mode FlameGame |
+| `lib/snake/adaptive/adaptive_game_page.dart` | Create | Adaptive mode page wrapper |
 | `lib/snake/free/free_snake.dart` | Create | Path-based smooth snake component |
 | `lib/snake/free/free_game.dart` | Create | Free mode FlameGame |
+| `lib/snake/free/free_game_page.dart` | Create | Free mode page wrapper |
 | `test/shared/score_service_test.dart` | Create | Score service unit tests |
 | `test/snake/classic/classic_snake_test.dart` | Create | Classic snake logic tests |
 
@@ -429,7 +432,7 @@ A StatefulWidget that wraps any game:
 - Resume → calls `onResume`, hides overlay
 - Quit → `Navigator.popUntil(context, ModalRoute.withName('/'))`
 - Android back button: `WillPopScope` / `PopScope` → triggers pause
-- Auto-pause: `WidgetsBindingObserver` with `didChangeAppLifecycleState` for Android; for Web, use `dart:html` (`document.onVisibilityChange`) with conditional import pattern (`import 'web_pause_stub.dart' if (dart.library.html) 'web_pause_html.dart'`) to avoid breaking non-web platforms
+- Auto-pause: `WidgetsBindingObserver` with `didChangeAppLifecycleState` — handles both Android (paused/resumed) and Web (hidden/resumed via visibilitychange, supported in Flutter 3.13+). No conditional imports needed.
 - Pause state: exposes `isPaused` that the game checks before processing input
 - `ValueListenableBuilder` to reactively display score from the FlameGame's ValueNotifier
 
@@ -440,7 +443,7 @@ A StatelessWidget page:
 - Dark background (#1A1A2E)
 - "Game Over" title in red (#E84545)
 - Stats grid: 2x2 grid of stat cards, each with label (grey) and value (white/colored)
-- "Play Again" button (#4ECCA3) → pops back to game page, then `data.replayCallback` triggers game reset (the game page widget's `setState` creates a new FlameGame instance, replacing the old one)
+- "Play Again" button (#4ECCA3) → calls `Navigator.pop(context)` to return to the game page, then invokes `data.replayCallback`. The `replayCallback` is a closure created by the game page (e.g., `ClassicGamePage`) before pushing GameOverPage: `replayCallback: () { setState(() { _gameKey = UniqueKey(); }); }`. The game page holds a `_gameKey` used as the `key` parameter on `GameWidget` — changing the key forces Flutter to dispose and recreate the widget, creating a fresh FlameGame instance.
 - "Home" button (#333) → `Navigator.popUntil(context, ModalRoute.withName('/'))`
 - Before displaying, call `ScoreService().saveHighScore(data.gameName, data.mode, score)`
 
@@ -556,15 +559,16 @@ import 'package:flame/components.dart';
 import 'dart:ui';
 import 'dart:math';
 
-// Abstract base
-abstract class FoodComponent extends PositionComponent {
+// Abstract base — uses generics for type-safe occupied positions
+abstract class FoodComponent<T> extends PositionComponent {
   static const Color foodColor = Color(0xFFE84545);
+  static const int _maxSpawnAttempts = 1000;
 
-  void respawn(List<dynamic> occupiedPositions, Vector2 areaSize);
+  void respawn(List<T> occupied, Vector2 areaSize);
 }
 
 // Grid-based food for Classic/Adaptive modes
-class GridFood extends FoodComponent {
+class GridFood extends FoodComponent<Point<int>> {
   final int columns;
   final int rows;
   final double cellSize;
@@ -577,26 +581,53 @@ class GridFood extends FoodComponent {
     required this.rows,
     required this.cellSize,
     required this.gridOffset,
-  });
+  }) {
+    size = Vector2.all(cellSize); // Set size once, not in render
+  }
 
-  void spawnInitial(int snakeHeadX, int snakeHeadY) {
-    // First food spawns in front of snake (right half)
+  void spawnInitial(List<Point<int>> occupiedCells) {
+    // First food spawns in front of snake (right half of grid)
     final random = Random();
+    int attempts = 0;
     do {
       gridX = (columns ~/ 2) + random.nextInt(columns ~/ 2);
       gridY = random.nextInt(rows);
-    } while (gridX == snakeHeadX && gridY == snakeHeadY);
+      attempts++;
+    } while (occupiedCells.any((c) => c.x == gridX && c.y == gridY)
+             && attempts < FoodComponent._maxSpawnAttempts);
+    // Fallback: if random fails, find first free cell
+    if (attempts >= FoodComponent._maxSpawnAttempts) {
+      _fallbackSpawn(occupiedCells);
+    }
     _updatePosition();
   }
 
   @override
-  void respawn(List<dynamic> occupiedCells, Vector2 areaSize) {
+  void respawn(List<Point<int>> occupiedCells, Vector2 areaSize) {
     final random = Random();
+    int attempts = 0;
     do {
       gridX = random.nextInt(columns);
       gridY = random.nextInt(rows);
-    } while (occupiedCells.any((c) => c.x == gridX && c.y == gridY));
+      attempts++;
+    } while (occupiedCells.any((c) => c.x == gridX && c.y == gridY)
+             && attempts < FoodComponent._maxSpawnAttempts);
+    if (attempts >= FoodComponent._maxSpawnAttempts) {
+      _fallbackSpawn(occupiedCells);
+    }
     _updatePosition();
+  }
+
+  void _fallbackSpawn(List<Point<int>> occupied) {
+    for (int x = 0; x < columns; x++) {
+      for (int y = 0; y < rows; y++) {
+        if (!occupied.any((c) => c.x == x && c.y == y)) {
+          gridX = x;
+          gridY = y;
+          return;
+        }
+      }
+    }
   }
 
   void _updatePosition() {
@@ -617,12 +648,14 @@ class GridFood extends FoodComponent {
 }
 
 // Radius-based food for Free mode
-class FreeFood extends FoodComponent {
+class FreeFood extends FoodComponent<Vector2> {
   static const double radius = 8.0;
   final Vector2 areaMin;
   final Vector2 areaMax;
 
-  FreeFood({required this.areaMin, required this.areaMax});
+  FreeFood({required this.areaMin, required this.areaMax}) {
+    size = Vector2.all(radius * 2); // Set size once in constructor
+  }
 
   void spawnInitial(Vector2 snakeHeadPos) {
     // Spawn in front (to the right) of snake head
@@ -631,23 +664,24 @@ class FreeFood extends FoodComponent {
       snakeHeadPos.x + 50 + random.nextDouble() * 100,
       areaMin.y + random.nextDouble() * (areaMax.y - areaMin.y),
     );
-    position.clamp(areaMin + Vector2.all(radius), areaMax - Vector2.all(radius));
+    // Clamp to play area (Vector2 has no clamp for two vectors, do it per axis)
+    position.x = position.x.clamp(areaMin.x + radius, areaMax.x - radius);
+    position.y = position.y.clamp(areaMin.y + radius, areaMax.y - radius);
   }
 
   @override
-  void respawn(List<dynamic> segments, Vector2 areaSize) {
+  void respawn(List<Vector2> segments, Vector2 areaSize) {
     final random = Random();
     bool tooClose;
+    int attempts = 0;
     do {
       position = Vector2(
         areaMin.x + radius + random.nextDouble() * (areaMax.x - areaMin.x - 2 * radius),
         areaMin.y + radius + random.nextDouble() * (areaMax.y - areaMin.y - 2 * radius),
       );
-      tooClose = segments.any((seg) {
-        final dist = position.distanceTo(seg as Vector2);
-        return dist < 32; // 2 * (segmentRadius + foodRadius)
-      });
-    } while (tooClose);
+      tooClose = segments.any((seg) => position.distanceTo(seg) < 32);
+      attempts++;
+    } while (tooClose && attempts < FoodComponent._maxSpawnAttempts);
   }
 
   @override
@@ -657,7 +691,6 @@ class FreeFood extends FoodComponent {
       radius,
       Paint()..color = FoodComponent.foodColor,
     );
-    size = Vector2.all(radius * 2);
   }
 }
 ```
@@ -709,7 +742,7 @@ Death animation:
 FlameGame subclass:
 
 ```dart
-class ClassicGame extends FlameGame with KeyboardEvents, HasCollisionDetection {
+class ClassicGame extends FlameGame with KeyboardEvents {
   final ValueNotifier<int> scoreNotifier = ValueNotifier(0);
   final void Function(Map<String, String> stats) onGameOver;
   bool isPaused = false;
@@ -758,8 +791,9 @@ class ClassicGame extends FlameGame with KeyboardEvents, HasCollisionDetection {
 
   @override
   void update(double dt) {
-    super.update(dt);
-    if (isPaused || snake.isDead) return;
+    if (isPaused) return;          // Paused: don't update anything
+    super.update(dt);              // Propagate to snake (handles death flash animation)
+    if (snake.isDead) return;      // Dead: only run death animation in super, skip game logic
     gameTime += dt;
     // Check if snake head is on food
     if (snake.body.first.x == food.gridX && snake.body.first.y == food.gridY) {
@@ -790,14 +824,72 @@ class ClassicGame extends FlameGame with KeyboardEvents, HasCollisionDetection {
 }
 ```
 
-- [ ] **Step 3: Create a wrapper page widget that connects ClassicGame to GameScaffold**
+- [ ] **Step 3: Create `lib/snake/classic/classic_game_page.dart`**
 
-In `lib/main.dart` route for `/snake/classic`, create a StatefulWidget `ClassicGamePage` that:
-- Creates `ClassicGame` instance
-- Wraps `GameWidget(game: classicGame)` in `GameScaffold`
-- Passes `scoreNotifier` to scaffold
-- Loads best score via `ScoreService`
-- On game over: pushes `GameOverPage` with `GameOverData` containing stats
+A StatefulWidget that connects ClassicGame to GameScaffold. **This is a separate file, NOT in main.dart.**
+
+```dart
+class ClassicGamePage extends StatefulWidget {
+  const ClassicGamePage({super.key});
+  @override
+  State<ClassicGamePage> createState() => _ClassicGamePageState();
+}
+
+class _ClassicGamePageState extends State<ClassicGamePage> {
+  Key _gameKey = UniqueKey();
+  late ClassicGame _game;
+  int _bestScore = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _createGame();
+    _loadBestScore();
+  }
+
+  void _createGame() {
+    _game = ClassicGame(onGameOver: (stats) async {
+      final score = int.tryParse(stats['Score'] ?? '0') ?? 0;
+      await ScoreService().saveHighScore('snake', 'classic', score);
+      final best = await ScoreService().getHighScore('snake', 'classic');
+      stats['Best'] = '$best';
+      if (mounted) {
+        Navigator.push(context, MaterialPageRoute(
+          builder: (_) => GameOverPage(
+            data: GameOverData(
+              gameName: 'snake',
+              mode: 'classic',
+              stats: stats,
+              replayCallback: () {
+                setState(() { _gameKey = UniqueKey(); _createGame(); });
+              },
+            ),
+          ),
+        ));
+      }
+    });
+  }
+
+  Future<void> _loadBestScore() async {
+    _bestScore = await ScoreService().getHighScore('snake', 'classic');
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GameScaffold(
+      title: 'Snake - Classic',
+      scoreNotifier: _game.scoreNotifier,
+      bestScore: _bestScore,
+      onPause: () => _game.isPaused = true,
+      onResume: () => _game.isPaused = false,
+      child: GameWidget(key: _gameKey, game: _game),
+    );
+  }
+}
+```
+
+Update `lib/main.dart` route for `/snake/classic` to import and use `ClassicGamePage`.
 
 - [ ] **Step 4: Create classic_snake_test.dart**
 
@@ -842,10 +934,10 @@ git commit -m "feat: implement Classic Snake mode with grid-based movement"
 
 - [ ] **Step 1: Create adaptive_snake.dart**
 
-Extends or reuses ClassicSnake logic but with dynamic grid size:
-- Same movement, input buffer, collision, rendering logic as ClassicSnake
-- Constructor takes `columns` and `rows` instead of fixed `gridSize = 20`
-- Ideally: extract shared grid snake logic into a base class or mixin that both Classic and Adaptive use
+Reuses ClassicSnake via a mixin architecture:
+- Extract the grid-based snake logic (movement, input buffer, collision, rendering) from `classic_snake.dart` into a mixin `GridSnakeMixin` (or simply make `ClassicSnake` accept `columns`/`rows` as constructor params instead of hardcoding `gridSize = 20`)
+- **Recommended approach:** Refactor `ClassicSnake` to accept `columns` and `rows` in the constructor. Classic mode passes `(20, 20)`. Adaptive mode passes the calculated grid dimensions. `AdaptiveSnake` then simply instantiates the same class with different grid params — no separate file needed, just import `ClassicSnake` in `adaptive_game.dart`.
+- If the logic diverges later, extract to a separate class at that point.
 
 - [ ] **Step 2: Create adaptive_game.dart**
 
