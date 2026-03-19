@@ -7,7 +7,7 @@ Validate the GitHub Actions auto-publish pipeline for the `mini-play` Flutter pr
 ## Prerequisites
 
 - Scaffold a Flutter project in the repo root via `flutter create .` (the repo currently only has a README.md)
-- Enable GitHub Pages in repo settings: Settings > Pages > Source: "Deploy from a branch" > Branch: `gh-pages` / `/ (root)`
+- After the first CI run (which auto-creates the `gh-pages` branch), enable GitHub Pages in repo settings: Settings > Pages > Source: "Deploy from a branch" > Branch: `gh-pages` / `/ (root)`
 
 ## Goals
 
