@@ -50,6 +50,7 @@ class _AdaptiveGamePageState extends State<AdaptiveGamePage> {
                     _windowTooSmall = false;
                     _createGame();
                   });
+                  _loadBestScore();
                 },
               ),
             ),

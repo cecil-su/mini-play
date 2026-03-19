@@ -100,8 +100,9 @@ class FreeFood extends FoodComponent<Vector2> {
       snakeHeadPos.x + 50 + random.nextDouble() * 100,
       areaMin.y + random.nextDouble() * (areaMax.y - areaMin.y),
     );
-    position.x = position.x.clamp(areaMin.x + radius, areaMax.x - radius);
-    position.y = position.y.clamp(areaMin.y + radius, areaMax.y - radius);
+    // Clamp so the food center (position + radius) stays within bounds
+    position.x = position.x.clamp(areaMin.x, areaMax.x - radius * 2);
+    position.y = position.y.clamp(areaMin.y, areaMax.y - radius * 2);
   }
 
   @override
@@ -118,9 +119,17 @@ class FreeFood extends FoodComponent<Vector2> {
             radius +
             random.nextDouble() * (areaMax.y - areaMin.y - 2 * radius),
       );
-      tooClose = segments.any((seg) => position.distanceTo(seg) < 32);
+      final foodCenter = position + Vector2.all(radius);
+      tooClose = segments.any((seg) => foodCenter.distanceTo(seg) < 32);
       attempts++;
     } while (tooClose && attempts < FoodComponent._maxSpawnAttempts);
+    if (attempts >= FoodComponent._maxSpawnAttempts) {
+      // Fallback: place at center of play area
+      position = Vector2(
+        (areaMin.x + areaMax.x) / 2,
+        (areaMin.y + areaMax.y) / 2,
+      );
+    }
   }
 
   @override

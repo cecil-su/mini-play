@@ -26,6 +26,7 @@ class FreeSnake extends Component {
 
   double _deathTimer = 0;
   bool _isFlashRed = false;
+  bool _deathCallbackFired = false;
 
   FreeSnake({
     required this.areaMin,
@@ -83,7 +84,8 @@ class FreeSnake extends Component {
       _deathTimer += dt;
       final flashIndex = (_deathTimer / 0.083).floor();
       _isFlashRed = flashIndex.isOdd;
-      if (_deathTimer >= 0.5) {
+      if (_deathTimer >= 0.5 && !_deathCallbackFired) {
+        _deathCallbackFired = true;
         onDeath();
       }
       return;

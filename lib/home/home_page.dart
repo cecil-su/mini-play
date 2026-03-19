@@ -22,9 +22,11 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadViewMode() async {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('home_view_mode') ?? 'grid';
-    setState(() {
-      _isGridMode = mode == 'grid';
-    });
+    if (mounted) {
+      setState(() {
+        _isGridMode = mode == 'grid';
+      });
+    }
   }
 
   Future<void> _setViewMode(bool gridMode) async {

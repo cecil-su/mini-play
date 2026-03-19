@@ -31,8 +31,10 @@ class AdaptiveGame extends FlameGame with KeyboardEvents, PanDetector {
 
   @override
   Future<void> onLoad() async {
-    columns = (size.x / _cellSize).floor().clamp(10, 40);
-    rows = (size.y / _cellSize).floor().clamp(10, 40);
+    final maxColumns = (size.x / _cellSize).floor();
+    final maxRows = (size.y / _cellSize).floor();
+    columns = maxColumns.clamp(5, 40);
+    rows = maxRows.clamp(5, 40);
     gridOffset = Vector2(
       (size.x - _cellSize * columns) / 2,
       (size.y - _cellSize * rows) / 2,

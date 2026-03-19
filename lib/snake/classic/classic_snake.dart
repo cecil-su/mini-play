@@ -21,6 +21,7 @@ class ClassicSnake extends Component {
 
   double _deathTimer = 0;
   bool _isFlashRed = false;
+  bool _deathCallbackFired = false;
 
   static const Color _headColor = Color(0xFF4ECCA3);
   static const Color _tailColor = Color(0xFF0E8263);
@@ -72,7 +73,8 @@ class ClassicSnake extends Component {
       _deathTimer += dt;
       final flashIndex = (_deathTimer / 0.083).floor();
       _isFlashRed = flashIndex.isOdd;
-      if (_deathTimer >= 0.5) {
+      if (_deathTimer >= 0.5 && !_deathCallbackFired) {
+        _deathCallbackFired = true;
         onDeath();
       }
       return;

@@ -46,6 +46,7 @@ class _FreeGamePageState extends State<FreeGamePage> {
                     _gameKey = UniqueKey();
                     _createGame();
                   });
+                  _loadBestScore();
                 },
               ),
             ),

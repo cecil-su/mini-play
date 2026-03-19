@@ -71,17 +71,45 @@ class _ModeInfo {
   });
 }
 
-class _ModeCard extends StatelessWidget {
+class _ModeCard extends StatefulWidget {
   final _ModeInfo mode;
 
   const _ModeCard({required this.mode});
 
   @override
+  State<_ModeCard> createState() => _ModeCardState();
+}
+
+class _ModeCardState extends State<_ModeCard> {
+  int _bestScore = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadScore();
+  }
+
+  Future<void> _loadScore() async {
+    final score =
+        await ScoreService().getHighScore('snake', widget.mode.scoreMode);
+    if (mounted) {
+      setState(() {
+        _bestScore = score;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final mode = widget.mode;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: GestureDetector(
-        onTap: () => Navigator.pushNamed(context, mode.route),
+        onTap: () {
+          Navigator.pushNamed(context, mode.route).then((_) {
+            _loadScore();
+          });
+        },
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -128,20 +156,13 @@ class _ModeCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              FutureBuilder<int>(
-                future:
-                    ScoreService().getHighScore('snake', mode.scoreMode),
-                builder: (context, snapshot) {
-                  final score = snapshot.data ?? 0;
-                  return Text(
-                    'Best: $score',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFFF0C040),
-                    ),
-                  );
-                },
+              Text(
+                'Best: $_bestScore',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFF0C040),
+                ),
               ),
             ],
           ),

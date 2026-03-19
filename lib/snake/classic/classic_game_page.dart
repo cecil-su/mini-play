@@ -46,6 +46,7 @@ class _ClassicGamePageState extends State<ClassicGamePage> {
                     _gameKey = UniqueKey();
                     _createGame();
                   });
+                  _loadBestScore();
                 },
               ),
             ),
