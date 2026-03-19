@@ -37,7 +37,8 @@ Exact versions to be verified against Flutter 3.41.5 compatibility at implementa
 ### Routing
 
 - Use hash-based routing (`/#/snake/classic`) for GitHub Pages compatibility
-- Routes: `/` (home), `/snake` (mode selection), `/snake/classic`, `/snake/adaptive`, `/snake/free`, `/game-over`
+- Routes: `/` (home), `/snake` (mode selection), `/snake/classic`, `/snake/adaptive`, `/snake/free`
+- Game Over is NOT a route — it is a full-screen overlay/page navigated to via `Navigator.push` with a `GameOverData` object (stats, game name, mode, replay callback). Direct browser access to `/#/game-over` is not possible since it doesn't exist as a route.
 
 ### Home Page
 
@@ -47,24 +48,29 @@ Exact versions to be verified against Flutter 3.41.5 compatibility at implementa
 - View preference persisted via shared_preferences
 - Implemented games: highlighted with accent border, tappable
 - Unimplemented games: dimmed (opacity 0.4), not tappable
-- Game metadata defined in a `GameRegistry` list (name, icon, description, phase, route, implemented flag)
+- Game metadata defined in a `GameRegistry` list (name, icon, description, phase, route, implemented flag, hasModePage flag)
+- Games without modes: `route` points directly to game page, `hasModePage` = false
+- Games with modes: `route` points to mode selection page, `hasModePage` = true
 
 ### Game Scaffold
 
 Common wrapper used by all games:
 - Top bar: back button (←), game title, pause button (⏸)
 - Score bar: current score + best score
+- Flame-to-Flutter score communication: FlameGame exposes a `ValueNotifier<int>` for score; GameScaffold listens to it for UI updates
 - Provides callbacks: `onPause`, `onResume`, `onGameOver`
 - Pause overlay: semi-transparent dark overlay with "Paused" text and "Resume" / "Quit" buttons
+- Pause state ignores all game input (direction keys, swipes) — inputs are only processed when game is running
 - Auto-pause: Web uses `visibilitychange` API (not focus), Android uses `AppLifecycleState`
 - Android back button: triggers pause (shows pause overlay), not exit
 
 ### Game Over Page
 
-Reusable result screen:
-- Stats grid: game-specific stats passed as key-value pairs (e.g., Score, Best, Time, Length)
-- Buttons: Play Again, Home
-- Updates high score automatically
+Reusable result screen (navigated via `Navigator.push`, not a named route):
+- Receives a `GameOverData` object: `{gameName, mode, stats: Map<String, String>, replayCallback}`
+- Stats grid: renders stats from the map (e.g., {"Score": "12", "Best": "35", "Time": "1:23", "Length": "15"})
+- Buttons: Play Again (calls replayCallback), Home (pops to root)
+- Updates high score automatically via ScoreService
 
 ### Score Service
 
@@ -78,8 +84,8 @@ Reusable result screen:
 ```
 HomePage → SnakeModePage → ClassicGame / AdaptiveGame / FreeGame
                                          ↓
-                                    GameOverPage → (Play Again) → Game
-                                                 → (Home) → HomePage
+                                    GameOverPage (push) → (Play Again) → Game
+                                                        → (Home) → HomePage
 ```
 
 ## Snake Game
@@ -121,14 +127,14 @@ All modes use constant speed in v1 (no speed progression as snake grows).
 ### Classic & Adaptive Mode Details
 
 - Snake moves one cell per tick (200ms = 5 cells/second)
-- Input is buffered: pressing a direction queues it for the next tick
+- Input buffer depth: 2 (allows queuing up to 2 direction changes per tick for quick corner turns)
 - Cannot reverse direction (e.g., moving right, pressing left is ignored)
-- Classic mode: 20×20 grid, cells stretch to fill available play area as a square (centered, using min(width, height) to maintain 1:1 aspect ratio)
+- Classic mode: 20×20 grid, cell size = floor(min(availableWidth, availableHeight) / 20) pixels, ensuring integer pixel alignment; remaining pixels become symmetric padding; play area is centered
 - Adaptive mode: fixed 20px cell size, grid calculated once at game start, not recalculated on resize
 - Adaptive mode: play area = screen minus top bar and score bar, cell count = floor(available width / 20px) × floor(available height / 20px), remaining pixels become symmetric padding
 - Adaptive mode: maximum grid cap of 40×40 to prevent excessively large play areas
-- Adaptive mode on Web resize: game area is clamped to initial grid size; if window shrinks below grid size, game area scrolls/clips (no recalculation mid-game)
-- Grid background: subtle grid lines (#1e2a4a, 1px) to show cell boundaries
+- Adaptive mode on Web resize: game area remains centered at initial grid size with clip (overflow hidden, no scrollbars); if window shrinks significantly, auto-pause and show "Window too small" message
+- Grid background: subtle grid lines (#1e2a4a, 1px) to show cell boundaries, aligned to integer pixel cell boundaries
 
 ### Free Mode Details
 
@@ -136,12 +142,12 @@ All modes use constant speed in v1 (no speed progression as snake grows).
 - **Turn rate**: 180°/second (hold left/right to turn continuously)
 - **Segment radius**: 8px (circular segments)
 - **Segment spacing**: 18px center-to-center along the movement path
-- **Head collision radius**: 8px (circle-circle intersection with wall boundaries and other segments)
+- **Wall collision**: circle-line intersection — head center distance to wall edge < 8px triggers death
+- **Self-collision**: check head circle against all body segment circles (skip first 5 segments to avoid immediate self-hit); circle-circle intersection (distance between centers < sum of radii)
 - **Food radius**: 8px, collision when head center is within 16px of food center
 - **Play area**: game area rectangle with 10px inset from edges
 - **Boundary rendering**: 2px solid border (#4a4a6a) around the play area so players can see the death boundary
 - **Path history**: store position trail, body segments sample positions at fixed intervals along the trail
-- **Self-collision**: check head circle against all body segment circles (skip first 5 segments to avoid immediate self-hit)
 
 ### Visual Design
 
@@ -176,10 +182,11 @@ lib/
 ├── home/
 │   ├── home_page.dart                 # Home page with grid/list toggle
 │   ├── game_card.dart                 # Game card widget
-│   └── game_registry.dart             # Game metadata list
+│   └── game_registry.dart             # Game metadata list (with hasModePage flag)
 ├── shared/
-│   ├── game_scaffold.dart             # Common game wrapper (pause, back, score)
-│   ├── game_over_page.dart            # Reusable game over screen
+│   ├── game_scaffold.dart             # Common game wrapper (pause, back, score via ValueNotifier)
+│   ├── game_over_page.dart            # Reusable game over screen (receives GameOverData)
+│   ├── game_over_data.dart            # Data class for game over params
 │   └── score_service.dart             # High score persistence
 ├── snake/
 │   ├── snake_mode_page.dart           # Mode selection page
@@ -193,7 +200,7 @@ lib/
 │   │   ├── free_game.dart             # Free mode FlameGame
 │   │   └── free_snake.dart            # Path-based smooth snake component
 │   └── components/
-│       ├── food_component.dart        # Food spawning and rendering (grid-based collision for Classic/Adaptive, radius-based for Free)
+│       ├── food_component.dart        # Abstract base with GridFood and FreeFood subclasses
 │       └── grid_background.dart       # Grid line rendering (Classic/Adaptive only, #1e2a4a 1px lines)
 ```
 
@@ -203,5 +210,7 @@ lib/
 - Each game gets its own directory (`lib/snake/`, later `lib/2048/`, etc.)
 - Grid-based snake (Classic/Adaptive) and Free snake have separate component classes — fundamentally different data models (grid coords vs. path history)
 - `adaptive_snake.dart` reuses classic grid logic but with different grid calculation
-- `components/` contains truly shared pieces (food, grid background)
+- `food_component.dart` uses abstract base + subclasses (`GridFood`, `FreeFood`) to avoid mixing collision/rendering logic
+- Flame-to-Flutter communication via `ValueNotifier` (score, game state)
+- Pause state blocks all game input processing
 - Small, focused files — one responsibility per file
