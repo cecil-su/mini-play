@@ -9,17 +9,22 @@ class MinesweeperBoard {
   final int totalMines;
   final Random _random = Random();
 
-  late List<List<MinesweeperCell>> grid;
-  int flagCount = 0;
-  bool isFirstMove = true;
-  MinesweeperGameState gameState = MinesweeperGameState.playing;
+  late List<List<MinesweeperCell>> _grid;
+  int _flagCount = 0;
+  bool _isFirstMove = true;
+  MinesweeperGameState _gameState = MinesweeperGameState.playing;
+
+  List<List<MinesweeperCell>> get grid => _grid;
+  int get flagCount => _flagCount;
+  bool get isFirstMove => _isFirstMove;
+  MinesweeperGameState get gameState => _gameState;
 
   MinesweeperBoard({
     required this.rows,
     required this.cols,
     required this.totalMines,
   }) {
-    grid = List.generate(
+    _grid = List.generate(
       rows,
       (_) => List.generate(cols, (_) => MinesweeperCell()),
     );
@@ -35,8 +40,8 @@ class MinesweeperBoard {
       : rows = values.length,
         cols = values[0].length,
         totalMines = values.expand((r) => r).where((v) => v == -1).length {
-    isFirstMove = false;
-    grid = List.generate(rows, (r) {
+    _isFirstMove = false;
+    _grid = List.generate(rows, (r) {
       return List.generate(cols, (c) {
         return MinesweeperCell(isMine: values[r][c] == -1);
       });
@@ -44,17 +49,17 @@ class MinesweeperBoard {
     _computeAdjacentMines();
   }
 
-  int get remainingMines => totalMines - flagCount;
+  int get remainingMines => totalMines - _flagCount;
 
   /// Reveal a cell. Triggers mine placement on first move.
   void reveal(int row, int col) {
-    if (gameState != MinesweeperGameState.playing) return;
-    final cell = grid[row][col];
+    if (_gameState != MinesweeperGameState.playing) return;
+    final cell = _grid[row][col];
     if (cell.isFlagged || cell.isRevealed) return;
 
-    if (isFirstMove) {
+    if (_isFirstMove) {
       _placeMines(row, col);
-      isFirstMove = false;
+      _isFirstMove = false;
     }
 
     if (cell.isMine) {
@@ -74,19 +79,19 @@ class MinesweeperBoard {
   /// Chord reveal: if a revealed number cell has exactly enough adjacent flags,
   /// reveal all unflagged, unrevealed neighbors.
   void chordReveal(int row, int col) {
-    if (gameState != MinesweeperGameState.playing) return;
-    final cell = grid[row][col];
+    if (_gameState != MinesweeperGameState.playing) return;
+    final cell = _grid[row][col];
     if (!cell.isRevealed || cell.adjacentMines == 0) return;
 
     int adjacentFlags = 0;
     for (final (nr, nc) in _neighbors(row, col)) {
-      if (grid[nr][nc].isFlagged) adjacentFlags++;
+      if (_grid[nr][nc].isFlagged) adjacentFlags++;
     }
 
     if (adjacentFlags != cell.adjacentMines) return;
 
     for (final (nr, nc) in _neighbors(row, col)) {
-      final neighbor = grid[nr][nc];
+      final neighbor = _grid[nr][nc];
       if (!neighbor.isRevealed && !neighbor.isFlagged) {
         if (neighbor.isMine) {
           _triggerLoss();
@@ -104,12 +109,12 @@ class MinesweeperBoard {
 
   /// Toggle flag on an unrevealed cell.
   void toggleFlag(int row, int col) {
-    if (gameState != MinesweeperGameState.playing) return;
-    final cell = grid[row][col];
+    if (_gameState != MinesweeperGameState.playing) return;
+    final cell = _grid[row][col];
     if (cell.isRevealed) return;
 
     cell.isFlagged = !cell.isFlagged;
-    flagCount += cell.isFlagged ? 1 : -1;
+    _flagCount += cell.isFlagged ? 1 : -1;
   }
 
   /// Place mines randomly, avoiding the safe zone around (safeRow, safeCol).
@@ -126,7 +131,7 @@ class MinesweeperBoard {
     candidates.shuffle(_random);
     for (int i = 0; i < totalMines && i < candidates.length; i++) {
       final (r, c) = candidates[i];
-      grid[r][c].isMine = true;
+      _grid[r][c].isMine = true;
     }
 
     _computeAdjacentMines();
@@ -136,12 +141,12 @@ class MinesweeperBoard {
   void _computeAdjacentMines() {
     for (int r = 0; r < rows; r++) {
       for (int c = 0; c < cols; c++) {
-        if (grid[r][c].isMine) continue;
+        if (_grid[r][c].isMine) continue;
         int count = 0;
         for (final (nr, nc) in _neighbors(r, c)) {
-          if (grid[nr][nc].isMine) count++;
+          if (_grid[nr][nc].isMine) count++;
         }
-        grid[r][c].adjacentMines = count;
+        _grid[r][c].adjacentMines = count;
       }
     }
   }
@@ -154,7 +159,7 @@ class MinesweeperBoard {
     while (queue.isNotEmpty) {
       final (r, c) = queue.removeFirst();
       for (final (nr, nc) in _neighbors(r, c)) {
-        final neighbor = grid[nr][nc];
+        final neighbor = _grid[nr][nc];
         if (neighbor.isRevealed || neighbor.isFlagged || neighbor.isMine) continue;
         neighbor.isRevealed = true;
         if (neighbor.adjacentMines == 0) {
@@ -166,10 +171,10 @@ class MinesweeperBoard {
 
   /// Trigger loss: reveal all mines, mark wrong flags.
   void _triggerLoss() {
-    gameState = MinesweeperGameState.lost;
+    _gameState = MinesweeperGameState.lost;
     for (int r = 0; r < rows; r++) {
       for (int c = 0; c < cols; c++) {
-        final cell = grid[r][c];
+        final cell = _grid[r][c];
         if (cell.isMine) {
           cell.isRevealed = true;
         } else if (cell.isFlagged) {
@@ -183,26 +188,24 @@ class MinesweeperBoard {
   void _checkWin() {
     for (int r = 0; r < rows; r++) {
       for (int c = 0; c < cols; c++) {
-        final cell = grid[r][c];
+        final cell = _grid[r][c];
         if (!cell.isMine && !cell.isRevealed) return;
       }
     }
-    gameState = MinesweeperGameState.won;
+    _gameState = MinesweeperGameState.won;
   }
 
   /// Get valid neighbor coordinates.
-  List<(int, int)> _neighbors(int row, int col) {
-    final result = <(int, int)>[];
+  Iterable<(int, int)> _neighbors(int row, int col) sync* {
     for (int dr = -1; dr <= 1; dr++) {
       for (int dc = -1; dc <= 1; dc++) {
         if (dr == 0 && dc == 0) continue;
         final nr = row + dr;
         final nc = col + dc;
         if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-          result.add((nr, nc));
+          yield (nr, nc);
         }
       }
     }
-    return result;
   }
 }

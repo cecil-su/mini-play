@@ -28,7 +28,7 @@ class MinesweeperPage extends StatefulWidget {
 class _MinesweeperPageState extends State<MinesweeperPage> {
   Key _gameKey = UniqueKey();
   late MinesweeperBoard _board;
-  late ValueNotifier<int> _timerNotifier;
+  final ValueNotifier<int> _timerNotifier = ValueNotifier<int>(0);
   int _bestTime = 0;
   bool _isPaused = false;
   bool _isDigMode = true; // true = dig, false = flag
@@ -51,7 +51,7 @@ class _MinesweeperPageState extends State<MinesweeperPage> {
       cols: _diff.cols,
       totalMines: _diff.mines,
     );
-    _timerNotifier = ValueNotifier<int>(0);
+    _timerNotifier.value = 0;
     _isPaused = false;
     _isDigMode = true;
     _elapsedSeconds = 0;
@@ -81,19 +81,17 @@ class _MinesweeperPageState extends State<MinesweeperPage> {
     _timer = null;
   }
 
-  void _onCellTap(int row, int col) {
+  void _handleCellInput(int row, int col, {required bool isDig}) {
     if (_board.gameState != MinesweeperGameState.playing || _isPaused) return;
 
     setState(() {
-      if (_isDigMode) {
-        // Dig mode: tap revealed number = chord, tap unrevealed = reveal
+      if (isDig) {
         if (_board.grid[row][col].isRevealed) {
           _board.chordReveal(row, col);
         } else {
           _board.reveal(row, col);
         }
       } else {
-        // Flag mode: tap = flag
         _board.toggleFlag(row, col);
       }
     });
@@ -106,29 +104,12 @@ class _MinesweeperPageState extends State<MinesweeperPage> {
     _handleGameState();
   }
 
+  void _onCellTap(int row, int col) {
+    _handleCellInput(row, col, isDig: _isDigMode);
+  }
+
   void _onCellLongPress(int row, int col) {
-    if (_board.gameState != MinesweeperGameState.playing || _isPaused) return;
-
-    setState(() {
-      if (_isDigMode) {
-        // Dig mode: long press = flag
-        _board.toggleFlag(row, col);
-      } else {
-        // Flag mode: long press = reveal
-        if (_board.grid[row][col].isRevealed) {
-          _board.chordReveal(row, col);
-        } else {
-          _board.reveal(row, col);
-        }
-      }
-    });
-
-    // Start timer only after first reveal (not on flag-only actions)
-    if (_timer == null && !_board.isFirstMove && _board.gameState == MinesweeperGameState.playing) {
-      _startTimer();
-    }
-
-    _handleGameState();
+    _handleCellInput(row, col, isDig: !_isDigMode);
   }
 
   void _onCellSecondaryTap(int row, int col) {
@@ -142,22 +123,33 @@ class _MinesweeperPageState extends State<MinesweeperPage> {
   void _handleGameState() {
     if (_board.gameState == MinesweeperGameState.won) {
       _stopTimer();
-      _onWin();
+      _onGameOver(won: true);
     } else if (_board.gameState == MinesweeperGameState.lost) {
       _stopTimer();
       setState(() {}); // Show revealed mines
       _gameOverDelayTimer = Timer(const Duration(seconds: 2), () {
-        if (mounted) _onLoss();
+        if (mounted) _onGameOver(won: false);
       });
     }
   }
 
-  Future<void> _onWin() async {
-    await ScoreService().saveHighScore(
-      'minesweeper', _diff.scoreMode, _elapsedSeconds,
-      lowerIsBetter: true,
-    );
-    final best = await ScoreService().getHighScore('minesweeper', _diff.scoreMode);
+  Future<void> _onGameOver({required bool won}) async {
+    Map<String, String> stats = {
+      'Time': formatTime(_elapsedSeconds),
+      'Difficulty': _diff.name,
+      'Mines': '${_diff.mines}',
+    };
+
+    if (won) {
+      await ScoreService().saveHighScore(
+        'minesweeper', _diff.scoreMode, _elapsedSeconds,
+        lowerIsBetter: true,
+      );
+      final best = await ScoreService().getHighScore('minesweeper', _diff.scoreMode);
+      if (!mounted) return;
+      stats['Best'] = best == 0 ? '--' : formatTime(best);
+    }
+
     if (!mounted) return;
 
     Navigator.push(
@@ -167,40 +159,7 @@ class _MinesweeperPageState extends State<MinesweeperPage> {
           data: GameOverData(
             gameName: 'minesweeper',
             mode: _diff.scoreMode,
-            stats: {
-              'Time': formatTime(_elapsedSeconds),
-              'Difficulty': _diff.name,
-              'Mines': '${_diff.mines}',
-              'Best': best == 0 ? '--' : formatTime(best),
-            },
-            replayCallback: () {
-              setState(() {
-                _gameKey = UniqueKey();
-                _createGame();
-              });
-              _loadBestTime();
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _onLoss() {
-    if (!mounted) return;
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => GameOverPage(
-          data: GameOverData(
-            gameName: 'minesweeper',
-            mode: _diff.scoreMode,
-            stats: {
-              'Time': formatTime(_elapsedSeconds),
-              'Difficulty': _diff.name,
-              'Mines': '${_diff.mines}',
-            },
+            stats: stats,
             replayCallback: () {
               setState(() {
                 _gameKey = UniqueKey();
@@ -215,6 +174,7 @@ class _MinesweeperPageState extends State<MinesweeperPage> {
   }
 
   void _onPause() {
+    if (_board.gameState != MinesweeperGameState.playing) return;
     _isPaused = true;
     _gameOverDelayTimer?.cancel();
   }
