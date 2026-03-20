@@ -43,9 +43,11 @@ This follows the same argument-passing pattern as 2048. Route argument extractio
 
 ```dart
 case '/minesweeper/play':
-  final difficulty = settings.arguments as MinesweeperDifficulty;
+  final difficulty = settings.arguments as MinesweeperDifficulty? ?? MinesweeperDifficulty.beginner;
   return MaterialPageRoute(builder: (_) => MinesweeperPage(difficulty: difficulty));
 ```
+
+`MinesweeperDifficulty` provides static const presets (`beginner`, `intermediate`, `expert`) for the three difficulty levels.
 
 ### Registry Updates
 
@@ -95,6 +97,16 @@ This guarantees the first click and its surrounding area are always safe.
 4. If `adjacentMines == 0` → BFS/flood fill: recursively reveal all connected cells with `adjacentMines == 0` and their boundary cells (first ring of non-zero numbers).
 5. After reveal, check win condition.
 
+### Chord/Auto-Reveal
+
+`chordReveal(row, col)`:
+1. Only works on revealed number cells (not empty, not unrevealed).
+2. Count adjacent flags. If `adjacentFlags == adjacentMines`, reveal all unflagged, unrevealed neighbors.
+3. If any of those neighbors is a mine (incorrectly unflagged), the player loses.
+4. This is triggered by tapping an already-revealed number cell (in dig mode).
+
+This is a core mechanic for experienced players — clicking a satisfied number auto-clears its remaining neighbors.
+
 ### Flag Logic
 
 `toggleFlag(row, col)`:
@@ -134,7 +146,7 @@ Where `formatTime(int seconds)` returns `'$seconds s'` for < 60, `'${seconds ~/ 
 ### Mine Counter
 
 Inside `GameScaffold.child`, the `MinesweeperPage` renders a `Column`:
-1. **Mine counter row** — centered text showing remaining mines: `totalMines - flagCount`. Styled with mine icon + count, using the app's gold color (`#F0C040`).
+1. **Mine counter row** — centered text showing remaining mines: `totalMines - flagCount`. Styled with mine icon + count. The counter can go negative if the player places more flags than mines (this is standard minesweeper behavior). Display color: gold (`#F0C040`) when >= 0, red (`#E84545`) when negative.
 2. **Board** (expanded) — the grid wrapped in InteractiveViewer.
 3. **Mode toggle button** — dig/flag switch.
 
@@ -149,8 +161,8 @@ Inside `GameScaffold.child`, the `MinesweeperPage` renders a `Column`:
 ### Board Rendering
 
 - `GridView.builder` for the grid (regular grid layout, not Stack).
-- Wrapped in `InteractiveViewer` for pinch-to-zoom and pan on all difficulty levels. Config: `minScale: 1.0`, `maxScale: 3.0`. For Beginner, the board fits on screen so zoom is available but not needed. For Expert, the initial view fits the full board width.
-- Cell size: `min(availableWidth / cols, availableHeight / rows)`, with a minimum of 28px. If the computed size is below 28px, the board overflows and InteractiveViewer handles scrolling.
+- Wrapped in `InteractiveViewer` for pinch-to-zoom and pan on all difficulty levels. Config: `minScale: 1.0`, `maxScale: 3.0`, `constrained: false` (allows content to exceed viewport).
+- Cell size: `max(availableWidth / cols, 28.0)`. For Beginner/Intermediate the board fits within the viewport. For Expert (30 cols), the cells may exceed the viewport width — `InteractiveViewer` with `constrained: false` handles panning. The child sizes itself at `cellSize * cols` × `cellSize * rows`, and InteractiveViewer allows panning to see the full board.
 
 ### Cell Widget States
 
@@ -167,18 +179,18 @@ Revealed cells use a flat light background `#D0D0D0` to ensure all number colors
 
 ### Number Colors
 
-All verified for sufficient contrast against `#D0D0D0` background:
+All meet WCAG AA contrast ratio (>= 4.5:1) against `#D0D0D0` background:
 
 | Number | Color |
 |--------|-------|
 | 1 | #0000FF (blue) |
-| 2 | #008000 (green) |
+| 2 | #006400 (dark green) |
 | 3 | #FF0000 (red) |
 | 4 | #000080 (dark blue) |
 | 5 | #800000 (brown/maroon) |
 | 6 | #008080 (cyan/teal) |
 | 7 | #303030 (dark gray — adjusted from black for readability) |
-| 8 | #808080 (gray) |
+| 8 | #606060 (dark gray) |
 
 ## Input Handling
 
@@ -206,8 +218,9 @@ The toggle button displays: dig mode icon (pickaxe ⛏️) or flag mode icon (fl
 ### Loss
 
 1. Mine detonated → reveal all mines, mark wrong flags, set `gameState = lost`.
-2. Wait 2 seconds (let player see the board). During this delay, input is already locked by `gameState != playing`. If the user navigates away (back button → pause overlay), the delay timer is cancelled.
-3. Navigate to `GameOverPage` with stats:
+2. Wait 2 seconds (let player see the board). Input is locked by `gameState != playing`.
+3. During the delay: the pause overlay is suppressed when `gameState == lost` (no "Resume" for a finished game). If the user presses back during the delay, cancel the timer and navigate home immediately.
+4. Navigate to `GameOverPage` with stats:
    - Time (formatted)
    - Difficulty name
    - Mines: total count
