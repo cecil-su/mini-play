@@ -19,13 +19,19 @@ class GameBoard {
   final int gridSize;
   final Random _random = Random();
 
-  List<Tile> tiles = [];
-  int score = 0;
-  int moveCount = 0;
-  bool hasReached2048 = false;
+  List<Tile> _tiles = [];
+  int _score = 0;
+  int _moveCount = 0;
+  bool _hasReached2048 = false;
 
   final List<_BoardSnapshot> _undoStack = [];
-  int undoRemaining = 3;
+  int _undoRemaining = 3;
+
+  List<Tile> get tiles => _tiles;
+  int get score => _score;
+  int get moveCount => _moveCount;
+  bool get hasReached2048 => _hasReached2048;
+  int get undoRemaining => _undoRemaining;
 
   GameBoard({required this.gridSize}) {
     _spawnTile();
@@ -40,7 +46,7 @@ class GameBoard {
         if (values[r][c] != 0) {
           final tile = Tile(value: values[r][c], row: r, col: c);
           tile.isNew = false;
-          tiles.add(tile);
+          _tiles.add(tile);
         }
       }
     }
@@ -49,8 +55,19 @@ class GameBoard {
   /// Convert tiles to a 2D value grid (for logic and testing).
   List<List<int>> toGrid() {
     final grid = List.generate(gridSize, (_) => List.filled(gridSize, 0));
-    for (final tile in tiles) {
+    for (final tile in _tiles) {
       grid[tile.row][tile.col] = tile.value;
+    }
+    return grid;
+  }
+
+  /// Build a 2D tile reference grid for O(1) cell lookup.
+  List<List<Tile?>> _buildTileGrid() {
+    final grid = List.generate(
+      gridSize, (_) => List<Tile?>.filled(gridSize, null),
+    );
+    for (final tile in _tiles) {
+      grid[tile.row][tile.col] = tile;
     }
     return grid;
   }
@@ -58,7 +75,7 @@ class GameBoard {
   /// Slide tiles in the given direction. Returns true if the board changed.
   bool slide(Direction direction) {
     // Save previous positions for animation
-    for (final tile in tiles) {
+    for (final tile in _tiles) {
       tile.savePreviousPosition();
       tile.isNew = false;
       tile.mergedFrom = null;
@@ -68,12 +85,15 @@ class GameBoard {
     // in-place (row/col). Must capture positions before they change.
     _pushUndoSnapshot();
 
+    // Build grid once for O(1) cell lookup in _getLine.
+    final grid = _buildTileGrid();
+
     int scoreGained = 0;
     bool moved = false;
     final newTiles = <Tile>[];
 
     for (int i = 0; i < gridSize; i++) {
-      final line = _getLine(i, direction);
+      final line = _getLine(i, direction, grid);
       final result = _slideLine(line);
       scoreGained += result.scoreGained;
       if (result.moved) moved = true;
@@ -90,15 +110,15 @@ class GameBoard {
       _undoStack.removeAt(0);
     }
 
-    tiles = newTiles;
-    score += scoreGained;
-    moveCount++;
+    _tiles = newTiles;
+    _score += scoreGained;
+    _moveCount++;
 
     // Check for 2048
-    if (!hasReached2048) {
-      for (final tile in tiles) {
+    if (!_hasReached2048) {
+      for (final tile in _tiles) {
         if (tile.value >= 2048) {
-          hasReached2048 = true;
+          _hasReached2048 = true;
           break;
         }
       }
@@ -109,7 +129,7 @@ class GameBoard {
   }
 
   /// Get a line of tiles for processing (row or column depending on direction).
-  List<Tile?> _getLine(int index, Direction direction) {
+  List<Tile?> _getLine(int index, Direction direction, List<List<Tile?>> grid) {
     final line = <Tile?>[];
 
     for (int i = 0; i < gridSize; i++) {
@@ -124,8 +144,7 @@ class GameBoard {
         case Direction.down:
           r = gridSize - 1 - i; c = index;
       }
-      final tile = tiles.where((t) => t.row == r && t.col == c).firstOrNull;
-      line.add(tile);
+      line.add(grid[r][c]);
     }
     return line;
   }
@@ -211,7 +230,7 @@ class GameBoard {
     if (empty.isEmpty) return;
     final pos = empty[_random.nextInt(empty.length)];
     final value = _random.nextDouble() < 0.9 ? 2 : 4;
-    tiles.add(Tile(value: value, row: pos.$1, col: pos.$2));
+    _tiles.add(Tile(value: value, row: pos.$1, col: pos.$2));
   }
 
   /// Check if the game is over (no empty cells and no adjacent equal cells).
@@ -230,7 +249,7 @@ class GameBoard {
   /// Get the maximum tile value on the board.
   int get maxTileValue {
     int max = 0;
-    for (final tile in tiles) {
+    for (final tile in _tiles) {
       if (tile.value > max) max = tile.value;
     }
     return max;
@@ -241,20 +260,22 @@ class GameBoard {
   /// the move is valid, to avoid evicting a valid entry on a no-op slide.
   void _pushUndoSnapshot() {
     _undoStack.add(_BoardSnapshot(
-      tiles: tiles.map((t) => t.copy()).toList(),
-      score: score,
-      moveCount: moveCount,
+      tiles: _tiles.map((t) => t.copy()).toList(),
+      score: _score,
+      moveCount: _moveCount,
     ));
   }
 
   /// Undo the last move. Returns true if successful.
+  /// Note: does not restore [hasReached2048] — once the 2048 milestone is
+  /// reached, it stays set so the congratulations overlay is shown only once.
   bool undo() {
-    if (_undoStack.isEmpty || undoRemaining <= 0) return false;
+    if (_undoStack.isEmpty || _undoRemaining <= 0) return false;
     final snapshot = _undoStack.removeLast();
-    tiles = snapshot.tiles;
-    score = snapshot.score;
-    moveCount = snapshot.moveCount;
-    undoRemaining--;
+    _tiles = snapshot.tiles;
+    _score = snapshot.score;
+    _moveCount = snapshot.moveCount;
+    _undoRemaining--;
     return true;
   }
 }

@@ -22,7 +22,7 @@ class Game2048Page extends StatefulWidget {
 class _Game2048PageState extends State<Game2048Page> {
   Key _gameKey = UniqueKey();
   late GameBoard _board;
-  late ValueNotifier<int> _scoreNotifier;
+  final ValueNotifier<int> _scoreNotifier = ValueNotifier<int>(0);
   int _bestScore = 0;
   bool _isPaused = false;
   bool _isAnimating = false;
@@ -40,7 +40,7 @@ class _Game2048PageState extends State<Game2048Page> {
 
   void _createGame() {
     _board = GameBoard(gridSize: widget.gridSize);
-    _scoreNotifier = ValueNotifier<int>(0);
+    _scoreNotifier.value = 0;
     _isPaused = false;
     _isAnimating = false;
     _show2048Overlay = false;
@@ -189,6 +189,7 @@ class _Game2048PageState extends State<Game2048Page> {
         child: GestureDetector(
           onPanEnd: (details) {
             final velocity = details.velocity.pixelsPerSecond;
+            if (velocity.distance < 100) return;
             if (velocity.dx.abs() > velocity.dy.abs()) {
               _onMove(velocity.dx > 0 ? Direction.right : Direction.left);
             } else {
