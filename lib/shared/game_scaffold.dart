@@ -7,6 +7,11 @@ class GameScaffold extends StatefulWidget {
   final Widget child;
   final VoidCallback onPause;
   final VoidCallback onResume;
+  final String scoreLabel;
+  final String bestLabel;
+  final String Function(int)? scoreFormatter;
+  final String Function(int)? bestFormatter;
+  final bool Function()? canPause;
 
   const GameScaffold({
     super.key,
@@ -16,6 +21,11 @@ class GameScaffold extends StatefulWidget {
     required this.child,
     required this.onPause,
     required this.onResume,
+    this.scoreLabel = 'Score',
+    this.bestLabel = 'Best',
+    this.scoreFormatter,
+    this.bestFormatter,
+    this.canPause,
   });
 
   @override
@@ -42,13 +52,20 @@ class _GameScaffoldState extends State<GameScaffold>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.hidden ||
         state == AppLifecycleState.paused) {
-      _pause();
+      _pause(fromLifecycle: true);
     }
   }
 
-  void _pause() {
+  void _pause({bool fromLifecycle = false}) {
+    if (!fromLifecycle && widget.canPause != null && !widget.canPause!()) {
+      _quit();
+      return;
+    }
     if (!_isPaused) {
-      setState(() => _isPaused = true);
+      final showOverlay = widget.canPause?.call() ?? true;
+      if (showOverlay) {
+        setState(() => _isPaused = true);
+      }
       widget.onPause();
     }
   }
@@ -117,7 +134,7 @@ class _GameScaffoldState extends State<GameScaffold>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Score: $score',
+                          '${widget.scoreLabel}: ${widget.scoreFormatter?.call(score) ?? '$score'}',
                           style: const TextStyle(
                             color: Color(0xFF4ECCA3),
                             fontSize: 16,
@@ -125,7 +142,7 @@ class _GameScaffoldState extends State<GameScaffold>
                           ),
                         ),
                         Text(
-                          'Best: ${widget.bestScore}',
+                          '${widget.bestLabel}: ${widget.bestFormatter?.call(widget.bestScore) ?? '${widget.bestScore}'}',
                           style: const TextStyle(
                             color: Color(0xFFF0C040),
                             fontSize: 16,
