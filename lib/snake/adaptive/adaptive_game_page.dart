@@ -1,10 +1,9 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
-import '../../shared/game_over_data.dart';
-import '../../shared/game_over_page.dart';
 import '../../shared/game_scaffold.dart';
 import '../../shared/score_service.dart';
+import '../components/snake_game_helper.dart';
 import 'adaptive_game.dart';
 
 class AdaptiveGamePage extends StatefulWidget {
@@ -29,35 +28,21 @@ class _AdaptiveGamePageState extends State<AdaptiveGamePage> {
   }
 
   void _createGame() {
-    _game = AdaptiveGame(onGameOver: (stats) async {
-      final score = int.tryParse(stats['Score'] ?? '0') ?? 0;
-      await ScoreService().saveHighScore('snake', 'adaptive', score);
-      final best = await ScoreService().getHighScore('snake', 'adaptive');
-      stats['Best'] = '$best';
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => GameOverPage(
-              data: GameOverData(
-                gameName: 'snake',
-                mode: 'adaptive',
-                stats: stats,
-                replayCallback: () {
-                  setState(() {
-                    _gameKey = UniqueKey();
-                    _initialSize = null;
-                    _windowTooSmall = false;
-                    _createGame();
-                  });
-                  _loadBestScore();
-                },
-              ),
-            ),
-          ),
-        );
-      }
-    });
+    _game = AdaptiveGame(
+      onGameOver: buildSnakeGameOverCallback(
+        context: context,
+        scoreMode: 'adaptive',
+        onReplay: () {
+          setState(() {
+            _gameKey = UniqueKey();
+            _initialSize = null;
+            _windowTooSmall = false;
+            _createGame();
+          });
+          _loadBestScore();
+        },
+      ),
+    );
   }
 
   Future<void> _loadBestScore() async {
@@ -79,10 +64,21 @@ class _AdaptiveGamePageState extends State<AdaptiveGamePage> {
       },
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final currentSize = Size(constraints.maxWidth, constraints.maxHeight);
+          final currentSize =
+              Size(constraints.maxWidth, constraints.maxHeight);
 
-          // Capture initial size on first layout
-          _initialSize ??= currentSize;
+          // Capture initial size after first layout via post-frame callback
+          // to avoid mutating state during build.
+          if (_initialSize == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() => _initialSize = currentSize);
+              }
+            });
+            return ClipRect(
+              child: GameWidget(key: _gameKey, game: _game),
+            );
+          }
 
           // Check if window is too small compared to initial size
           final tooSmall = currentSize.width < _initialSize!.width ||

@@ -1,10 +1,9 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
-import '../../shared/game_over_data.dart';
-import '../../shared/game_over_page.dart';
 import '../../shared/game_scaffold.dart';
 import '../../shared/score_service.dart';
+import '../components/snake_game_helper.dart';
 import 'free_game.dart';
 
 class FreeGamePage extends StatefulWidget {
@@ -27,33 +26,19 @@ class _FreeGamePageState extends State<FreeGamePage> {
   }
 
   void _createGame() {
-    _game = FreeGame(onGameOver: (stats) async {
-      final score = int.tryParse(stats['Score'] ?? '0') ?? 0;
-      await ScoreService().saveHighScore('snake', 'free', score);
-      final best = await ScoreService().getHighScore('snake', 'free');
-      stats['Best'] = '$best';
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => GameOverPage(
-              data: GameOverData(
-                gameName: 'snake',
-                mode: 'free',
-                stats: stats,
-                replayCallback: () {
-                  setState(() {
-                    _gameKey = UniqueKey();
-                    _createGame();
-                  });
-                  _loadBestScore();
-                },
-              ),
-            ),
-          ),
-        );
-      }
-    });
+    _game = FreeGame(
+      onGameOver: buildSnakeGameOverCallback(
+        context: context,
+        scoreMode: 'free',
+        onReplay: () {
+          setState(() {
+            _gameKey = UniqueKey();
+            _createGame();
+          });
+          _loadBestScore();
+        },
+      ),
+    );
   }
 
   Future<void> _loadBestScore() async {

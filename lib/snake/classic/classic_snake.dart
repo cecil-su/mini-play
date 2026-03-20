@@ -110,10 +110,9 @@ class ClassicSnake extends Component {
         return;
       }
 
-      // Self collision — exclude last element if not growing
-      final checkBody =
-          _shouldGrow ? body : body.sublist(0, body.length - 1);
-      if (checkBody.any((p) => p.x == newHead.x && p.y == newHead.y)) {
+      // Self collision — exclude last segment if not growing (it will vacate)
+      final checkLength = _shouldGrow ? body.length : body.length - 1;
+      if (body.take(checkLength).any((p) => p.x == newHead.x && p.y == newHead.y)) {
         isDead = true;
         return;
       }

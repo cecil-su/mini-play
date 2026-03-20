@@ -23,6 +23,7 @@ class FreeSnake extends Component {
   final List<Vector2> _pathHistory = [];
   int _segmentCount = 3;
   bool isDead = false;
+  List<Vector2> _cachedSegments = [];
 
   double _deathTimer = 0;
   bool _isFlashRed = false;
@@ -100,8 +101,9 @@ class FreeSnake extends Component {
     // Append to path history
     _pathHistory.add(headPosition.clone());
 
-    // Trim path history to avoid unbounded growth
-    // Keep enough path for all segments
+    // Trim path history to avoid unbounded growth.
+    // Each entry is one frame's movement (~2px at 60fps). The 0.5 divisor
+    // provides a conservative margin so segments remain smooth at low frame rates.
     final maxPathLength = (_segmentCount + 2) * (segmentSpacing / 0.5).ceil();
     if (_pathHistory.length > maxPathLength) {
       _pathHistory.removeRange(0, _pathHistory.length - maxPathLength);
@@ -116,10 +118,12 @@ class FreeSnake extends Component {
       return;
     }
 
+    // Cache segments for reuse in render() — avoids recomputing the path walk.
+    _cachedSegments = segments;
+
     // Self collision — check head vs body segments (skip first 5)
-    final segs = segments;
-    for (int i = 5; i < segs.length; i++) {
-      if (headPosition.distanceTo(segs[i]) < segmentRadius * 2) {
+    for (int i = 5; i < _cachedSegments.length; i++) {
+      if (headPosition.distanceTo(_cachedSegments[i]) < segmentRadius * 2) {
         isDead = true;
         return;
       }
@@ -128,7 +132,7 @@ class FreeSnake extends Component {
 
   @override
   void render(Canvas canvas) {
-    final segs = segments;
+    final segs = _cachedSegments.isNotEmpty ? _cachedSegments : segments;
 
     // Draw body segments first (tail to head), head last on top
     for (int i = segs.length - 1; i >= 0; i--) {
