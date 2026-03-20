@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'game_2048/game_2048_mode_page.dart';
+import 'game_2048/game_2048_page.dart';
 import 'home/home_page.dart';
 import 'snake/adaptive/adaptive_game_page.dart';
 import 'snake/classic/classic_game_page.dart';
@@ -58,6 +60,17 @@ class MiniPlayApp extends StatelessWidget {
             return MaterialPageRoute(
               settings: settings,
               builder: (_) => const FreeGamePage(),
+            );
+          case '/2048':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const Game2048ModePage(),
+            );
+          case '/2048/play':
+            final gridSize = settings.arguments as int? ?? 4;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => Game2048Page(gridSize: gridSize),
             );
           default:
             return MaterialPageRoute(

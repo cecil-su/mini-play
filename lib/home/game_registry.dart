@@ -37,6 +37,8 @@ class GameRegistry {
       description: 'Slide and merge number tiles',
       phase: 1,
       route: '/2048',
+      implemented: true,
+      hasModePage: true,
     ),
     GameInfo(
       name: 'Minesweeper',
