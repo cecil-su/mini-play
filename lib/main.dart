@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'game_2048/game_2048_mode_page.dart';
 import 'game_2048/game_2048_page.dart';
 import 'home/home_page.dart';
+import 'minesweeper/minesweeper_cell.dart';
+import 'minesweeper/minesweeper_mode_page.dart';
+import 'minesweeper/minesweeper_page.dart';
 import 'snake/adaptive/adaptive_game_page.dart';
 import 'snake/classic/classic_game_page.dart';
 import 'snake/free/free_game_page.dart';
@@ -71,6 +74,17 @@ class MiniPlayApp extends StatelessWidget {
             return MaterialPageRoute(
               settings: settings,
               builder: (_) => Game2048Page(gridSize: gridSize),
+            );
+          case '/minesweeper':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const MinesweeperModePage(),
+            );
+          case '/minesweeper/play':
+            final difficulty = settings.arguments as MinesweeperDifficulty? ?? MinesweeperDifficulty.beginner;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => MinesweeperPage(difficulty: difficulty),
             );
           default:
             return MaterialPageRoute(

@@ -46,6 +46,8 @@ class GameRegistry {
       description: 'Find all mines without detonating',
       phase: 1,
       route: '/minesweeper',
+      implemented: true,
+      hasModePage: true,
     ),
     GameInfo(
       name: 'Tetris',
