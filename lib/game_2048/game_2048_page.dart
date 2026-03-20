@@ -55,16 +55,14 @@ class _Game2048PageState extends State<Game2048Page> {
   void _onMove(Direction direction) {
     if (_isPaused || _isAnimating || _show2048Overlay) return;
 
-    setState(() {
-      _isAnimating = true;
-    });
-
     final moved = _board.slide(direction);
     if (moved) {
       _scoreNotifier.value = _board.score;
     }
 
-    setState(() {});
+    setState(() {
+      _isAnimating = true;
+    });
 
     // Wait for animation to finish
     Future.delayed(kTileAnimationDuration, () {
@@ -231,7 +229,7 @@ class _Game2048PageState extends State<Game2048Page> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: TextButton.icon(
-                  onPressed: _board.undoRemaining > 0 ? _onUndo : null,
+                  onPressed: _board.undoRemaining > 0 && _board.moveCount > 0 ? _onUndo : null,
                   icon: const Icon(Icons.undo),
                   label: Text('Undo (${_board.undoRemaining})'),
                   style: TextButton.styleFrom(
