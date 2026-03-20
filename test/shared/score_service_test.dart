@@ -31,5 +31,25 @@ void main() {
       await service.saveHighScore('2048', 'default', 2048);
       expect(await service.getHighScore('2048', 'default'), 2048);
     });
+
+    test('lowerIsBetter saves lower score', () async {
+      final service = ScoreService();
+      await service.saveHighScore('minesweeper', 'beginner', 100, lowerIsBetter: true);
+      await service.saveHighScore('minesweeper', 'beginner', 50, lowerIsBetter: true);
+      expect(await service.getHighScore('minesweeper', 'beginner'), 50);
+    });
+
+    test('lowerIsBetter does not save higher score', () async {
+      final service = ScoreService();
+      await service.saveHighScore('minesweeper', 'beginner', 50, lowerIsBetter: true);
+      await service.saveHighScore('minesweeper', 'beginner', 100, lowerIsBetter: true);
+      expect(await service.getHighScore('minesweeper', 'beginner'), 50);
+    });
+
+    test('lowerIsBetter saves first score when no record exists', () async {
+      final service = ScoreService();
+      await service.saveHighScore('minesweeper', 'beginner', 42, lowerIsBetter: true);
+      expect(await service.getHighScore('minesweeper', 'beginner'), 42);
+    });
   });
 }
