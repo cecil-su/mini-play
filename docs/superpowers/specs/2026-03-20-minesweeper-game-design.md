@@ -8,11 +8,13 @@ Minesweeper is the third game in the mini-play collection. A classic grid-based 
 
 Three classic difficulty presets, selectable from a mode page:
 
-| Difficulty | Grid | Mines | Color |
-|------------|------|-------|-------|
-| Beginner | 9×9 | 10 | #4ECCA3 (green) |
-| Intermediate | 16×16 | 40 | #3A86FF (blue) |
-| Expert | 30×16 | 99 | #E84545 (red) |
+| Difficulty | Rows | Cols | Mines | Color |
+|------------|------|------|-------|-------|
+| Beginner | 9 | 9 | 10 | #4ECCA3 (green) |
+| Intermediate | 16 | 16 | 40 | #3A86FF (blue) |
+| Expert | 16 | 30 | 99 | #E84545 (red) |
+
+Expert is 16 rows × 30 columns (landscape orientation), matching classic Windows Minesweeper.
 
 ## Architecture
 
@@ -27,7 +29,7 @@ lib/minesweeper/
 ├── minesweeper_mode_page.dart     # Difficulty selection (Beginner/Intermediate/Expert)
 ├── minesweeper_page.dart          # Game page (timer, mine count, board, mode toggle)
 ├── minesweeper_board.dart         # Board logic (mine placement, reveal, flag, win/loss)
-├── minesweeper_cell.dart          # Cell data model
+├── minesweeper_cell.dart          # Cell data model + difficulty config
 ├── minesweeper_colors.dart        # Number color mapping (1=blue, 2=green, 3=red, etc.)
 └── minesweeper_cell_widget.dart   # Cell rendering Widget
 ```
@@ -61,24 +63,24 @@ In `game_registry.dart`: set `implemented: true`, `hasModePage: true` for the Mi
 ### Difficulty Config (MinesweeperDifficulty)
 
 - `name`: String — display name (e.g., "Beginner")
-- `rows`: int
-- `cols`: int
-- `mines`: int
+- `rows`: int — number of rows
+- `cols`: int — number of columns
+- `mines`: int — total mine count
 - `scoreMode`: String — key for ScoreService (e.g., "beginner")
 
 ### Board State (MinesweeperBoard)
 
-- `grid`: `List<List<MinesweeperCell>>` — 2D grid of cells.
+- `grid`: `List<List<MinesweeperCell>>` — 2D grid of cells, outer list is rows.
 - `rows`, `cols`, `totalMines` — board configuration.
 - `flagCount`: int — number of flags currently placed.
 - `isFirstMove`: bool — true until the first cell is revealed.
-- `gameState`: enum `GameState { playing, won, lost }`.
+- `gameState`: enum `MinesweeperGameState { playing, won, lost }`.
 
 ### Mine Placement Algorithm
 
 Mines are placed lazily — only after the first click:
 
-1. Collect all cell positions except the clicked cell and its 8 neighbors (safe zone).
+1. Collect all cell positions except the clicked cell and its neighbors within the board bounds (the safe zone is the intersection of the 3×3 area centered on the clicked cell and the board boundaries — corner clicks have 4 safe cells, edge clicks have 6, interior clicks have 9).
 2. Randomly select `totalMines` positions from the remaining cells.
 3. Place mines and compute `adjacentMines` for every cell.
 
@@ -88,9 +90,10 @@ This guarantees the first click and its surrounding area are always safe.
 
 `reveal(row, col)`:
 1. If cell is flagged or already revealed → ignore.
-2. If cell is a mine → `gameState = lost`, reveal all mines, mark incorrectly flagged cells.
-3. If `adjacentMines == 0` → BFS/flood fill: recursively reveal all connected cells with `adjacentMines == 0` and their boundary cells (first ring of non-zero numbers).
-4. After reveal, check win condition.
+2. If `isFirstMove` → place mines (with safe zone around clicked cell), set `isFirstMove = false`.
+3. If cell is a mine → `gameState = lost`, reveal all mines, mark incorrectly flagged cells.
+4. If `adjacentMines == 0` → BFS/flood fill: recursively reveal all connected cells with `adjacentMines == 0` and their boundary cells (first ring of non-zero numbers).
+5. After reveal, check win condition.
 
 ### Flag Logic
 
@@ -111,11 +114,29 @@ When a mine is revealed:
 
 ## UI Layout
 
-### GameScaffold Adaptation
+### GameScaffold Modification
 
-- `scoreNotifier` drives the timer display (seconds elapsed).
-- `bestScore` shows the best time for this difficulty.
-- Remaining mine count (`totalMines - flagCount`) displayed in a row above the board.
+`GameScaffold` currently hardcodes `'Score: $score'` and `'Best: ${widget.bestScore}'`. To support Minesweeper's timer display, add optional label/format parameters:
+
+```dart
+class GameScaffold extends StatefulWidget {
+  // ... existing fields ...
+  final String scoreLabel;    // default: 'Score'
+  final String bestLabel;     // default: 'Best'
+  final String Function(int)? scoreFormatter;  // default: null (uses '$value')
+  final String Function(int)? bestFormatter;   // default: null (uses '$value')
+```
+
+Minesweeper uses: `scoreLabel: 'Time'`, `bestLabel: 'Best'`, `scoreFormatter: formatTime`, `bestFormatter: (v) => v == 0 ? '--' : formatTime(v)`.
+
+Where `formatTime(int seconds)` returns `'$seconds s'` for < 60, `'${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}'` for >= 60.
+
+### Mine Counter
+
+Inside `GameScaffold.child`, the `MinesweeperPage` renders a `Column`:
+1. **Mine counter row** — centered text showing remaining mines: `totalMines - flagCount`. Styled with mine icon + count, using the app's gold color (`#F0C040`).
+2. **Board** (expanded) — the grid wrapped in InteractiveViewer.
+3. **Mode toggle button** — dig/flag switch.
 
 ### Timer
 
@@ -128,21 +149,25 @@ When a mine is revealed:
 ### Board Rendering
 
 - `GridView.builder` for the grid (regular grid layout, not Stack).
-- Wrapped in `InteractiveViewer` for pinch-to-zoom and pan (Expert mode 30×16 needs scrolling on small screens).
-- Cell size adapts: computed from available width / cols, with a minimum cell size of 28px.
+- Wrapped in `InteractiveViewer` for pinch-to-zoom and pan on all difficulty levels. Config: `minScale: 1.0`, `maxScale: 3.0`. For Beginner, the board fits on screen so zoom is available but not needed. For Expert, the initial view fits the full board width.
+- Cell size: `min(availableWidth / cols, availableHeight / rows)`, with a minimum of 28px. If the computed size is below 28px, the board overflows and InteractiveViewer handles scrolling.
 
 ### Cell Widget States
+
+Revealed cells use a flat light background `#D0D0D0` to ensure all number colors are readable.
 
 | State | Display |
 |-------|---------|
 | Unrevealed | Raised gray block (`#8E8E8E` surface, `#BDBDBD` highlight) |
-| Flagged | Flag icon on gray block |
-| Revealed - number | Colored number on flat light surface (1=blue, 2=green, 3=red, 4=dark blue, 5=brown, 6=cyan, 7=black, 8=gray) |
-| Revealed - empty (0) | Flat light surface, no content |
-| Revealed - mine | Mine icon on red background |
-| Wrong flag (game over) | X mark over flag |
+| Flagged | Flag icon on raised gray block |
+| Revealed - number | Colored number on `#D0D0D0` flat surface |
+| Revealed - empty (0) | `#D0D0D0` flat surface, no content |
+| Revealed - mine | Mine icon on `#E84545` red background |
+| Wrong flag (game over) | X mark over flag on `#E84545` background |
 
 ### Number Colors
+
+All verified for sufficient contrast against `#D0D0D0` background:
 
 | Number | Color |
 |--------|-------|
@@ -152,7 +177,7 @@ When a mine is revealed:
 | 4 | #000080 (dark blue) |
 | 5 | #800000 (brown/maroon) |
 | 6 | #008080 (cyan/teal) |
-| 7 | #000000 (black) |
+| 7 | #303030 (dark gray — adjusted from black for readability) |
 | 8 | #808080 (gray) |
 
 ## Input Handling
@@ -164,9 +189,11 @@ Two interaction modes, toggled via a button below the board:
 - **Dig mode** (default): tap = reveal, long press = flag.
 - **Flag mode**: tap = flag, long press = reveal.
 
+The toggle button displays: dig mode icon (pickaxe ⛏️) or flag mode icon (flag 🚩), with the active mode highlighted in the primary green color (`#4ECCA3`). Inactive mode shown in gray.
+
 ### Platform-Specific
 
-- **Web/Desktop**: right-click always flags (regardless of current mode).
+- **Web/Desktop**: right-click always flags (regardless of current mode). Handled via `Listener` widget's `onPointerDown` checking for `kSecondaryButton`.
 - **Touch**: tap + long press behavior depends on current mode.
 
 ### Input Locking
@@ -178,25 +205,25 @@ Two interaction modes, toggled via a button below the board:
 
 ### Loss
 
-1. Mine detonated → reveal all mines, mark wrong flags.
-2. Wait 2 seconds (let player see the board).
+1. Mine detonated → reveal all mines, mark wrong flags, set `gameState = lost`.
+2. Wait 2 seconds (let player see the board). During this delay, input is already locked by `gameState != playing`. If the user navigates away (back button → pause overlay), the delay timer is cancelled.
 3. Navigate to `GameOverPage` with stats:
-   - Time (seconds)
+   - Time (formatted)
    - Difficulty name
    - Mines: total count
 
 ### Win
 
-1. All non-mine cells revealed.
+1. All non-mine cells revealed, set `gameState = won`.
 2. Save best time via `ScoreService` (only if faster than current record).
 3. Navigate to `GameOverPage` with stats:
-   - Time (seconds)
+   - Time (formatted)
    - Difficulty name
    - Mines: total count
    - Best Time
 
 `GameOverPage` provides "Play Again" and "Home" buttons (reused from shared).
-"Play Again" recreates the game page with `UniqueKey()`.
+"Play Again" pops `GameOverPage`, then the underlying `MinesweeperPage` does `setState` with a new `UniqueKey()` to recreate (same pattern as 2048).
 
 ## ScoreService Modification
 
@@ -209,6 +236,7 @@ Future<void> saveHighScore(String game, String mode, int score, {bool lowerIsBet
   final prefs = await SharedPreferences.getInstance();
   final current = prefs.getInt(_key(game, mode)) ?? 0;
   if (lowerIsBetter) {
+    // 0 means no previous record (sentinel). A real time is always > 0.
     if (current == 0 || score < current) {
       await prefs.setInt(_key(game, mode), score);
     }
@@ -222,16 +250,18 @@ Future<void> saveHighScore(String game, String mode, int score, {bool lowerIsBet
 
 Existing callers (Snake, 2048) are unaffected since `lowerIsBetter` defaults to `false`.
 
+**Display logic for best time**: `getHighScore` returns `0` for no record. The mode page and GameScaffold display `0` as `'--'` (no record) since a time of 0 seconds is impossible in gameplay.
+
 ## Mode Selection Page
 
 Follows `snake_mode_page.dart` / `game_2048_mode_page.dart` pattern:
 
 - Three difficulty cards with icon + name + description + best time.
-- Best time displayed as "Best: --" if no record, otherwise "Best: 42s".
-- Tap navigates to `/minesweeper/play` with difficulty config as argument.
+- Best time: `0` → display `'Best: --'`, otherwise `'Best: 42s'` (or `'Best: 1:30'` for >= 60s).
+- Tap navigates to `/minesweeper/play` with `MinesweeperDifficulty` as argument.
 
 ## Shared Infrastructure Reuse
 
-- `GameScaffold`: top bar (timer as score), pause overlay.
+- `GameScaffold`: top bar (with customizable labels for timer), pause overlay.
 - `ScoreService`: best time persistence (with `lowerIsBetter` flag).
 - `GameOverPage`: game over screen with stats and replay.
