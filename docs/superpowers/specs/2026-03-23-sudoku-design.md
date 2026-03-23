@@ -4,6 +4,13 @@
 
 9x9 经典数独游戏，内置谜题生成器，4 个难度级别，积分制计分。
 
+## Prerequisites (Shared Changes)
+
+Before or alongside Sudoku implementation, modify the shared `GameOverData` class:
+- Add optional `String? title` field to `GameOverData` (`lib/shared/game_over_data.dart`)
+- Update `GameOverPage` to use `data.title ?? 'Game Over'`
+- Backward-compatible: all existing callers omit `title` and get the default
+
 ## Core Requirements
 
 - 9x9 标准数独，宫格 3x3
@@ -39,27 +46,33 @@ Note: error state is computed by `SudokuBoard._updateErrors()` after each mutati
 
 | Level | Empty Cells | scoreMode |
 |-------|------------|-----------|
-| 简单  | ~36        | `easy`    |
-| 中等  | ~45        | `medium`  |
-| 困难  | ~50        | `hard`    |
-| 专家  | ~54        | `expert`  |
+| Level | Empty Cells | decayRate | errorPenalty | scoreMode |
+|-------|------------|-----------|-------------|-----------|
+| 简单  | ~32        | 3         | 25          | `easy`    |
+| 中等  | ~40        | 2         | 50          | `medium`  |
+| 困难  | ~48        | 1.5       | 75          | `hard`    |
+| 专家  | ~54        | 1         | 100         | `expert`  |
 
 ```dart
 class SudokuDifficulty {
   final String name;
   final int emptyCells;
+  final double decayRate;    // time bonus decay per second
+  final int errorPenalty;    // points lost per error
   final String scoreMode;
 
   const SudokuDifficulty({
     required this.name,
     required this.emptyCells,
+    required this.decayRate,
+    required this.errorPenalty,
     required this.scoreMode,
   });
 
-  static const easy = SudokuDifficulty(name: '简单', emptyCells: 36, scoreMode: 'easy');
-  static const medium = SudokuDifficulty(name: '中等', emptyCells: 45, scoreMode: 'medium');
-  static const hard = SudokuDifficulty(name: '困难', emptyCells: 50, scoreMode: 'hard');
-  static const expert = SudokuDifficulty(name: '专家', emptyCells: 54, scoreMode: 'expert');
+  static const easy = SudokuDifficulty(name: '简单', emptyCells: 32, decayRate: 3, errorPenalty: 25, scoreMode: 'easy');
+  static const medium = SudokuDifficulty(name: '中等', emptyCells: 40, decayRate: 2, errorPenalty: 50, scoreMode: 'medium');
+  static const hard = SudokuDifficulty(name: '困难', emptyCells: 48, decayRate: 1.5, errorPenalty: 75, scoreMode: 'hard');
+  static const expert = SudokuDifficulty(name: '专家', emptyCells: 54, decayRate: 1, errorPenalty: 100, scoreMode: 'expert');
 }
 ```
 
@@ -77,9 +90,9 @@ class SudokuBoard {
   void toggleNote(int row, int col, int value);
   void clearCell(int row, int col);
   bool hasConflict(int row, int col);
-  bool isComplete();
-  bool isDigitComplete(int digit); // true if all 9 instances placed
-  SudokuGameState get gameState;  // playing | won
+  bool isComplete();              // true when ALL cells match solution[row][col]
+  bool isDigitComplete(int digit); // true if all 9 instances placed correctly
+  SudokuGameState get gameState;  // playing → won when isComplete() returns true
 
   // Test constructor for unit tests
   SudokuBoard.fromGrid(this.grid, this.solution);
@@ -117,23 +130,38 @@ Note: `_updateErrors()` is called internally at the end of every public mutation
 
 **Platform notes:**
 - `Isolate.spawn` is NOT available on web. Use `compute()` from `package:flutter/foundation.dart` which maps to isolates on native and runs synchronously on web.
-- If web expert generation blocks UI noticeably, consider breaking generation into chunks with `Future.delayed(Duration.zero)` between iterations to yield to the event loop.
+- On web, generation MUST use chunked async: yield every ~50 iterations in `_fillBoard` and `_digHoles` via `await Future.delayed(Duration.zero)`. This makes `generate()` return `Future<SudokuBoard>`.
+- On native, use `compute()` for background generation (non-blocking).
+- Branch via `kIsWeb` to select strategy.
+- Show a `CircularProgressIndicator` centered on an empty board while generating.
 
 ## Scoring System
 
 ```
 baseScore    = difficulty base (easy: 1000, medium: 2000, hard: 3000, expert: 5000)
-timeBonus    = max(0, baseScore - elapsedSeconds * 2)
-errorPenalty = errorCount * 50
-finalScore   = baseScore + timeBonus - errorPenalty
+timeBonus    = max(0, baseScore - elapsedSeconds * difficulty.decayRate)
+errorPenalty = errorCount * difficulty.errorPenalty
+finalScore   = max(0, baseScore + timeBonus - errorPenalty)
 ```
 
-- Higher difficulty = higher base score
-- Speed bonus decays over time, floor at 0
-- `errorCount` increments by 1 each time `setValue` is called with a value that does not match `solution[row][col]`. Undo does not decrement errorCount. Erasing and re-entering a wrong value counts as an additional error.
+**Time bonus windows per difficulty:**
+- Easy: bonus → 0 at ~333s (~5.5 min), tight for simple puzzles
+- Medium: bonus → 0 at ~1000s (~16.7 min), comfortable
+- Hard: bonus → 0 at ~2000s (~33 min), generous for hard puzzles
+- Expert: bonus → 0 at ~5000s (~83 min), matches expected solve time
+
+**Error penalty impact (20 errors):**
+- Easy: 20 × 25 = 500 (25% of max 2000)
+- Medium: 20 × 50 = 1000 (25% of max 4000)
+- Expert: 20 × 100 = 2000 (20% of max 10000)
+
+**Error counting rules:**
+- `errorCount` increments by 1 each time `setValue` is called with a value that does not match `solution[row][col]`
+- Undo does not decrement errorCount
+- Erasing and re-entering a wrong value counts as an additional error
 - Notes do not count as errors
-- `finalScore = max(0, finalScore)` — scores are clamped to zero minimum
-- Storage: existing `ScoreService` with `lowerIsBetter: false`
+
+Storage: existing `ScoreService` with `lowerIsBetter: false`
 
 ### GameOver Stats
 
@@ -171,6 +199,22 @@ Note: Sudoku has no lose condition — the player always completes the puzzle. E
 4. "撤销" reverts last action
 5. "清除" clears selected cell's value and notes
 6. Given cells can be selected (for highlighting) but not edited
+7. Toggling between fill/notes mode preserves the currently selected cell
+8. Number pad taps are no-ops when no cell is selected
+
+**Win transition:** When `isComplete()` returns true (all cells match solution), immediately:
+1. Set `gameState = won`
+2. Freeze timer
+3. Disable all input (undo, number pad, clear, cell selection)
+4. Navigate to `GameOverPage` after a brief delay (~1s)
+
+**Keyboard input (web/desktop):**
+- Arrow keys / WASD: move cell selection
+- Number keys 1-9: input digit in current mode
+- 0 / Delete / Backspace: clear cell
+- N: toggle note mode
+- Z / Ctrl+Z: undo
+- Use `Focus` widget with `autofocus: true` (same pattern as 2048 and Sokoban)
 
 ### Cell Visual States (layered, bottom to top)
 
@@ -207,6 +251,18 @@ class UndoAction {
 - `toggleNote`: captures the note set before toggling. On undo, restore the previous note set.
 - Error display toggle is a display preference, not a game action — it is not undoable.
 - `oldNotes` must always be deep-copied via `Set<int>.of(cell.notes)` to avoid reference sharing bugs.
+
+**No-op rules (do not push to undo stack):**
+- `clearCell` on an empty cell with no notes → no-op
+- `setValue` with the same value the cell already holds → no-op
+- Undo when `_history` is empty → no-op; undo button should appear disabled (reduced opacity)
+- Any input after `gameState == won` → no-op
+
+**Notes auto-removal policy:**
+Notes in peer cells (same row/col/box) are NOT auto-removed when a number is placed. Players must manually manage their notes. This is a deliberate simplification to keep the undo system straightforward (otherwise `UndoAction` would need to capture notes across multiple cells).
+
+**Error display toggle:**
+The toggle only affects rendering. `errorCells` is always computed by `_updateErrors()` regardless of toggle state. Toggling ON mid-game immediately reveals all current errors. Toggling OFF hides them. The toggle is not undoable.
 
 ## File Structure
 
