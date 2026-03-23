@@ -14,10 +14,10 @@ class GameOverPage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Game Over',
+            Text(
+              data.title ?? 'Game Over',
               style: TextStyle(
-                color: Color(0xFFE84545),
+                color: data.title != null ? const Color(0xFF4ECCA3) : const Color(0xFFE84545),
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
               ),
