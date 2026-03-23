@@ -101,8 +101,25 @@ class _SokobanPageState extends State<SokobanPage> {
           data: GameOverData(
             gameName: 'sokoban',
             mode: 'level_$_currentLevel',
+            title: '恭喜通关',
             stats: stats,
-            replayCallback: hasNext ? _goNextLevel : _replayCurrent,
+            replayCallback: _replayCurrent,
+            actions: [
+              if (hasNext)
+                GameOverAction(
+                  label: 'Next Level',
+                  onPressed: _goNextLevel,
+                  isPrimary: true,
+                ),
+              GameOverAction(
+                label: 'Replay',
+                onPressed: _replayCurrent,
+              ),
+              GameOverAction(
+                label: 'Home',
+                onPressed: () {},
+              ),
+            ],
           ),
         ),
       ),

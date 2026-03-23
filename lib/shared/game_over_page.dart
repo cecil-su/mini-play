@@ -40,49 +40,93 @@ class GameOverPage extends StatelessWidget {
             const SizedBox(height: 24),
 
             // Action buttons
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4ECCA3),
-                    foregroundColor: const Color(0xFF1A1A2E),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    data.replayCallback();
-                  },
-                  child: const Text(
-                    'Play Again',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                TextButton(
-                  onPressed: () {
-                    Navigator.popUntil(context, ModalRoute.withName('/'));
-                  },
-                  child: const Text(
-                    'Home',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            if (data.actions != null)
+              ..._buildCustomActions(context)
+            else
+              ..._buildDefaultActions(context),
           ],
         ),
       ),
     );
+  }
+  List<Widget> _buildDefaultActions(BuildContext context) {
+    return [
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4ECCA3),
+              foregroundColor: const Color(0xFF1A1A2E),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              data.replayCallback();
+            },
+            child: const Text(
+              'Play Again',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(width: 16),
+          TextButton(
+            onPressed: () {
+              Navigator.popUntil(context, ModalRoute.withName('/'));
+            },
+            child: const Text(
+              'Home',
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  List<Widget> _buildCustomActions(BuildContext context) {
+    return [
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < data.actions!.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            if (data.actions![i].isPrimary)
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4ECCA3),
+                  foregroundColor: const Color(0xFF1A1A2E),
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  minimumSize: const Size(180, 44),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  data.actions![i].onPressed();
+                },
+                child: Text(
+                  data.actions![i].label,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              )
+            else
+              TextButton(
+                onPressed: () {
+                  if (data.actions![i].label == 'Home') {
+                    Navigator.popUntil(context, ModalRoute.withName('/'));
+                  } else {
+                    Navigator.pop(context);
+                    data.actions![i].onPressed();
+                  }
+                },
+                child: Text(
+                  data.actions![i].label,
+                  style: const TextStyle(color: Colors.grey, fontSize: 16),
+                ),
+              ),
+          ],
+        ],
+      ),
+    ];
   }
 }
 
