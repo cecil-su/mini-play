@@ -41,8 +41,8 @@ Note: error state is computed by `SudokuBoard._updateErrors()` after each mutati
 |-------|------------|-----------|
 | 简单  | ~36        | `easy`    |
 | 中等  | ~45        | `medium`  |
-| 困难  | ~52        | `hard`    |
-| 专家  | ~58        | `expert`  |
+| 困难  | ~50        | `hard`    |
+| 专家  | ~54        | `expert`  |
 
 ```dart
 class SudokuDifficulty {
@@ -58,8 +58,8 @@ class SudokuDifficulty {
 
   static const easy = SudokuDifficulty(name: '简单', emptyCells: 36, scoreMode: 'easy');
   static const medium = SudokuDifficulty(name: '中等', emptyCells: 45, scoreMode: 'medium');
-  static const hard = SudokuDifficulty(name: '困难', emptyCells: 52, scoreMode: 'hard');
-  static const expert = SudokuDifficulty(name: '专家', emptyCells: 58, scoreMode: 'expert');
+  static const hard = SudokuDifficulty(name: '困难', emptyCells: 50, scoreMode: 'hard');
+  static const expert = SudokuDifficulty(name: '专家', emptyCells: 54, scoreMode: 'expert');
 }
 ```
 
@@ -71,15 +71,22 @@ Game logic model encapsulating the 9x9 grid.
 class SudokuBoard {
   List<List<SudokuCell>> grid;    // 9x9
   List<List<int>> solution;       // complete answer for validation
+  Set<(int, int)> errorCells;     // computed by _updateErrors()
 
   void setValue(int row, int col, int value);
   void toggleNote(int row, int col, int value);
   void clearCell(int row, int col);
   bool hasConflict(int row, int col);
   bool isComplete();
+  bool isDigitComplete(int digit); // true if all 9 instances placed
   SudokuGameState get gameState;  // playing | won
+
+  // Test constructor for unit tests
+  SudokuBoard.fromGrid(this.grid, this.solution);
 }
 ```
+
+Note: `_updateErrors()` is called internally at the end of every public mutation method (`setValue`, `toggleNote`, `clearCell`). The page never calls it directly.
 
 ## Puzzle Generation
 
@@ -94,17 +101,23 @@ class SudokuBoard {
    - Check row, column, box constraints; recurse on valid placement
    - Backtrack on failure
 2. Save completed grid as `solution`
-3. **`_digHoles(count)`** — remove cells
-   - Randomly select a filled cell, tentatively clear it
-   - Call `_countSolutions()` to verify unique solution remains
-   - If not unique, restore cell and try another
-   - Repeat until target empty count reached
+3. **`_digHoles(count)`** — remove cells with retry logic
+   - Shuffle all 81 cell positions, iterate in order (avoids retrying same cell)
+   - For each cell: tentatively clear it, call `_countSolutions()` to verify unique solution
+   - If not unique, restore and skip to next cell
+   - If all remaining cells exhausted without reaching target: accept current count if within `emptyCells - 3` of target, otherwise restart from step 1
+   - `maxRestarts = 5` — if exceeded, use best result so far
 
 **`_countSolutions(grid)`** — backtracking solver
 - Find first empty cell, try 1-9
 - Early return once 2 solutions found (only need to confirm "not unique")
+- Implementation note: pass a mutable counter (`List<int>`) and check `count[0] >= 2` before each recursive call for clean early exit
 
-**Performance:** 9x9 generation + validation: easy <50ms, expert <200ms on modern devices. If generation exceeds 500ms on low-end devices or web (dart2js), fallback to running in an isolate or reducing the target hole count with a retry limit.
+**Performance:** 9x9 generation + validation: easy <50ms, expert <200ms on modern native devices. Web (dart2js) may be 3-10x slower due to JS compilation overhead.
+
+**Platform notes:**
+- `Isolate.spawn` is NOT available on web. Use `compute()` from `package:flutter/foundation.dart` which maps to isolates on native and runs synchronously on web.
+- If web expert generation blocks UI noticeably, consider breaking generation into chunks with `Future.delayed(Duration.zero)` between iterations to yield to the event loop.
 
 ## Scoring System
 
@@ -139,35 +152,41 @@ stats: {
 
 Home → SudokuModePage → SudokuPage → GameOverPage
 
-Note: Sudoku has no lose condition — the player always completes the puzzle. `GameOverPage` title should display "Puzzle Complete" instead of "Game Over". If `GameOverData` does not support custom titles, extend it with an optional `title` parameter.
+Note: Sudoku has no lose condition — the player always completes the puzzle. Extend `GameOverData` with an optional `String? title` field (default: `'Game Over'`). `GameOverPage` uses `data.title ?? 'Game Over'` so all existing callers are unaffected. Sudoku passes `title: '恭喜通关'`. This is a shared improvement that also benefits Sokoban and other win-only games.
 
 ### Game Page Layout (top to bottom)
 
-1. **GameScaffold top bar** — back, title, pause, score display
-2. **9x9 board grid** — square, centered, with 3x3 box borders. Use `LayoutBuilder` to size the board within available vertical space (accounting for controls below), consistent with minesweeper pattern
-3. **Action bar** — [填数] [笔记] [撤销] [清除]
-4. **Number pad** — [1][2][3][4][5][6][7][8][9] (gray out numbers with all 9 instances placed)
-5. **Error toggle** — switch for error highlighting on/off
+1. **GameScaffold top bar** — back, title, pause, score display (~96px)
+2. **9x9 board grid** — square, centered, with 3x3 box borders (2px bright `#4ECCA3` at 0.5 opacity for box borders, 0.5px dim for cell borders). Use `LayoutBuilder` to size the board within available vertical space. Minimum cell size: 36px. Notes font minimum: 8px.
+3. **Action bar** — [填数] [笔记] [撤销] [清除] [错误提示 icon toggle] (~48px). Error toggle is an eye/eye-off icon button merged into this row to save vertical space.
+4. **Number pad** — [1][2][3][4][5][6][7][8][9] (gray out numbers with all 9 instances placed). Minimum button size: 44px. On narrow screens (<360px), fall back to 3x3 grid layout (~100px). On normal screens, single row (~48px).
+
+**Vertical space budget:** ~96px (scaffold) + board + ~48px (action bar) + ~48-100px (numpad) = controls take ~192-244px. On a 640px screen, board gets ~396-448px → cell size ~44-50px. On a 568px screen (iPhone SE), board gets ~324-376px → cell size ~36-42px. Minimum cell size of 36px is maintained.
 
 ### Interaction Flow
 
 1. Tap a cell → select it (highlight row, column, box, and same-number cells)
 2. Tap number on pad → fill or toggle note based on current mode
-3. "填数/笔记" toggles input mode
+3. "填数/笔记" toggles input mode (use active/inactive styling consistent with minesweeper's dig/flag toggle pattern)
 4. "撤销" reverts last action
 5. "清除" clears selected cell's value and notes
 6. Given cells can be selected (for highlighting) but not edited
 
-### Cell Visual States
+### Cell Visual States (layered, bottom to top)
 
+```
+Layer 0 (base):    Empty dark background
+Layer 1 (region):  Related highlight — subtle tint for same row/col/box
+Layer 2 (number):  Same-number highlight — medium tint (overrides Layer 1)
+Layer 3 (error):   Red background tint when error display enabled (overrides Layer 1-2)
+Layer 4 (select):  Selected cell — bright highlight border (additive, on top of any bg)
+```
+
+**Text colors:**
 - **Given** — bold, primary color (#4ECCA3)
 - **User input** — normal weight, gold (#F0C040)
-- **Error** — red background tint when error display enabled
-- **Selected** — bright highlight border
-- **Related** — subtle highlight for same row/col/box
-- **Same number** — medium highlight for cells with same value
-- **Notes** — 3x3 mini-grid of small numbers inside cell
-- **Empty** — dark background
+- **Error text** — red (#E84545) when error display enabled
+- **Notes** — 3x3 mini-grid of small numbers, only shown in empty cells, color #6688AA
 
 ### Undo System
 
@@ -175,14 +194,19 @@ Note: Sudoku has no lose condition — the player always completes the puzzle. `
 class UndoAction {
   final int row, col;
   final int oldValue;
-  final Set<int> oldNotes;
+  final Set<int> oldNotes; // MUST deep-copy: Set<int>.of(cell.notes)
   final UndoType type; // setValue, toggleNote, clearCell
 }
 ```
 
 `_history: List<UndoAction>` — unlimited undo stack.
 
-Note: error display toggle is a display preference, not a game action — it is not undoable.
+**Semantics:**
+- `setValue`: when placing a value on a cell that has notes, the notes are cleared. `UndoAction` must capture both `oldValue` and `oldNotes` (deep-copied). On undo, restore both.
+- `clearCell`: clears value AND notes. `UndoAction` must capture both `oldValue` and `oldNotes`. On undo, restore both.
+- `toggleNote`: captures the note set before toggling. On undo, restore the previous note set.
+- Error display toggle is a display preference, not a game action — it is not undoable.
+- `oldNotes` must always be deep-copied via `Set<int>.of(cell.notes)` to avoid reference sharing bugs.
 
 ## File Structure
 
@@ -236,5 +260,5 @@ case '/sudoku/play':
 StatefulWidget + ValueNotifier (consistent with all existing games):
 - `ValueNotifier<int>` for score updates
 - `setState()` for board changes
-- `Timer` for elapsed time
+- `Timer` for elapsed time — starts on first `setValue` or `toggleNote` action (not on cell selection), so browsing the puzzle before starting is free
 - `UniqueKey()` for game reset
