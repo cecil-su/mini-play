@@ -17,6 +17,12 @@
 
 ## Data Model
 
+### SudokuGameState
+
+```dart
+enum SudokuGameState { playing, won }
+```
+
 ### SudokuCell
 
 ```dart
@@ -24,9 +30,10 @@ class SudokuCell {
   int value;          // 0 = empty
   bool isGiven;       // preset by puzzle, not editable
   Set<int> notes;     // pencil marks (1-9)
-  bool isError;       // conflict flag (when error checking enabled)
 }
 ```
+
+Note: error state is computed by `SudokuBoard._updateErrors()` after each mutation, not stored on the cell. The board maintains a `Set<(int, int)> errorCells` for UI binding.
 
 ### SudokuDifficulty
 
@@ -43,10 +50,16 @@ class SudokuDifficulty {
   final int emptyCells;
   final String scoreMode;
 
-  static const easy = SudokuDifficulty('简单', 36, 'easy');
-  static const medium = SudokuDifficulty('中等', 45, 'medium');
-  static const hard = SudokuDifficulty('困难', 52, 'hard');
-  static const expert = SudokuDifficulty('专家', 58, 'expert');
+  const SudokuDifficulty({
+    required this.name,
+    required this.emptyCells,
+    required this.scoreMode,
+  });
+
+  static const easy = SudokuDifficulty(name: '简单', emptyCells: 36, scoreMode: 'easy');
+  static const medium = SudokuDifficulty(name: '中等', emptyCells: 45, scoreMode: 'medium');
+  static const hard = SudokuDifficulty(name: '困难', emptyCells: 52, scoreMode: 'hard');
+  static const expert = SudokuDifficulty(name: '专家', emptyCells: 58, scoreMode: 'expert');
 }
 ```
 
@@ -91,7 +104,7 @@ class SudokuBoard {
 - Find first empty cell, try 1-9
 - Early return once 2 solutions found (only need to confirm "not unique")
 
-**Performance:** 9x9 generation + validation: easy <50ms, expert <200ms. Synchronous execution, no isolate needed.
+**Performance:** 9x9 generation + validation: easy <50ms, expert <200ms on modern devices. If generation exceeds 500ms on low-end devices or web (dart2js), fallback to running in an isolate or reducing the target hole count with a retry limit.
 
 ## Scoring System
 
@@ -104,8 +117,9 @@ finalScore   = baseScore + timeBonus - errorPenalty
 
 - Higher difficulty = higher base score
 - Speed bonus decays over time, floor at 0
-- Each incorrect fill (value != solution) costs 50 points, regardless of error display toggle
+- `errorCount` increments by 1 each time `setValue` is called with a value that does not match `solution[row][col]`. Undo does not decrement errorCount. Erasing and re-entering a wrong value counts as an additional error.
 - Notes do not count as errors
+- `finalScore = max(0, finalScore)` — scores are clamped to zero minimum
 - Storage: existing `ScoreService` with `lowerIsBetter: false`
 
 ### GameOver Stats
@@ -125,12 +139,14 @@ stats: {
 
 Home → SudokuModePage → SudokuPage → GameOverPage
 
+Note: Sudoku has no lose condition — the player always completes the puzzle. `GameOverPage` title should display "Puzzle Complete" instead of "Game Over". If `GameOverData` does not support custom titles, extend it with an optional `title` parameter.
+
 ### Game Page Layout (top to bottom)
 
 1. **GameScaffold top bar** — back, title, pause, score display
-2. **9x9 board grid** — square, centered, with 3x3 box borders
+2. **9x9 board grid** — square, centered, with 3x3 box borders. Use `LayoutBuilder` to size the board within available vertical space (accounting for controls below), consistent with minesweeper pattern
 3. **Action bar** — [填数] [笔记] [撤销] [清除]
-4. **Number pad** — [1][2][3][4][5][6][7][8][9]
+4. **Number pad** — [1][2][3][4][5][6][7][8][9] (gray out numbers with all 9 instances placed)
 5. **Error toggle** — switch for error highlighting on/off
 
 ### Interaction Flow
@@ -165,6 +181,8 @@ class UndoAction {
 ```
 
 `_history: List<UndoAction>` — unlimited undo stack.
+
+Note: error display toggle is a display preference, not a game action — it is not undoable.
 
 ## File Structure
 
