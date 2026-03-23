@@ -79,7 +79,6 @@ class SudokuBoard {
     } else {
       cell.notes.add(value);
     }
-    _updateErrors();
   }
 
   void clearCell(int row, int col) {

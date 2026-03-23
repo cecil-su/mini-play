@@ -29,6 +29,7 @@ class _SudokuPageState extends State<SudokuPage> {
   int _errorCount = 0;
   int _elapsed = 0;
   Timer? _timer;
+  Timer? _winDelayTimer;
   bool _timerStarted = false;
   bool _isPaused = false;
   bool _isNoteMode = false;
@@ -146,7 +147,7 @@ class _SudokuPageState extends State<SudokuPage> {
     _timer?.cancel();
     _updateScore();
 
-    Future.delayed(const Duration(seconds: 1), () {
+    _winDelayTimer = Timer(const Duration(seconds: 1), () {
       if (!mounted) return;
       final score = _scoreNotifier.value;
       ScoreService().saveHighScore('sudoku', widget.difficulty.scoreMode, score);
@@ -156,7 +157,7 @@ class _SudokuPageState extends State<SudokuPage> {
         MaterialPageRoute(
           builder: (_) => GameOverPage(
             data: GameOverData(
-              gameName: 'Sudoku',
+              gameName: 'sudoku',
               mode: widget.difficulty.name,
               title: '恭喜通关',
               stats: {
@@ -175,11 +176,13 @@ class _SudokuPageState extends State<SudokuPage> {
 
   void _replay() {
     _timer?.cancel();
+    _winDelayTimer?.cancel();
     setState(() {
       _board = null;
       _elapsed = 0;
       _errorCount = 0;
       _timerStarted = false;
+      _isPaused = false;
       _isNoteMode = false;
       _selectedRow = null;
       _selectedCol = null;
@@ -193,6 +196,7 @@ class _SudokuPageState extends State<SudokuPage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _winDelayTimer?.cancel();
     _scoreNotifier.dispose();
     super.dispose();
   }
@@ -273,7 +277,7 @@ class _SudokuPageState extends State<SudokuPage> {
   Widget build(BuildContext context) {
     return GameScaffold(
       key: _gameKey,
-      title: 'Sudoku',
+      title: 'Sudoku - ${widget.difficulty.name}',
       scoreNotifier: _scoreNotifier,
       bestScore: _bestScore,
       scoreLabel: 'Score',
@@ -415,7 +419,7 @@ class _SudokuPageState extends State<SudokuPage> {
             icon: _showErrors ? Icons.visibility : Icons.visibility_off,
             label: '检查',
             isActive: _showErrors,
-            onTap: () => setState(() => _showErrors = !_showErrors),
+            onTap: won ? null : () => setState(() => _showErrors = !_showErrors),
           ),
         ],
       ),
@@ -436,13 +440,17 @@ class _SudokuPageState extends State<SudokuPage> {
             : Colors.grey;
     return GestureDetector(
       onTap: enabled ? onTap : null,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 2),
-          Text(label, style: TextStyle(color: color, fontSize: 10)),
-        ],
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(color: color, fontSize: 10)),
+          ],
+        ),
       ),
     );
   }
