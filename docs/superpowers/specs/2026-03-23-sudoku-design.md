@@ -44,8 +44,6 @@ Note: error state is computed by `SudokuBoard._updateErrors()` after each mutati
 
 ### SudokuDifficulty
 
-| Level | Empty Cells | scoreMode |
-|-------|------------|-----------|
 | Level | Empty Cells | decayRate | errorPenalty | scoreMode |
 |-------|------------|-----------|-------------|-----------|
 | 简单  | ~32        | 3         | 25          | `easy`    |
@@ -153,6 +151,7 @@ finalScore   = max(0, baseScore + timeBonus - errorPenalty)
 **Error penalty impact (20 errors):**
 - Easy: 20 × 25 = 500 (25% of max 2000)
 - Medium: 20 × 50 = 1000 (25% of max 4000)
+- Hard: 20 × 75 = 1500 (25% of max 6000)
 - Expert: 20 × 100 = 2000 (20% of max 10000)
 
 **Error counting rules:**
