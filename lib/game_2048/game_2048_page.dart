@@ -263,6 +263,8 @@ class _BoardWidget extends StatelessWidget {
         final cellSize = (boardSize - totalSpacing) / gridSize;
 
         return Container(
+          width: boardSize,
+          height: boardSize,
           decoration: BoxDecoration(
             color: TileColors.boardBackground,
             borderRadius: BorderRadius.circular(8),
