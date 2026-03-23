@@ -309,11 +309,14 @@ class _SudokuPageState extends State<SudokuPage> {
   }
 
   Widget _buildBoard() {
+    // Border widths: left(2) + 3 box borders(2×3) + 6 cell borders(0.5×6) = 11px per axis
+    const borderOverhead = 2.0 + 3 * 2.0 + 6 * 0.5;
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        final boardSize = min(constraints.maxWidth, constraints.maxHeight);
-        final cellSize = boardSize / 9;
-        final actualBoardSize = cellSize * 9;
+        final available = min(constraints.maxWidth, constraints.maxHeight);
+        final cellSize = (available - borderOverhead) / 9;
+        final actualBoardSize = cellSize * 9 + borderOverhead;
 
         return Center(
           child: SizedBox(
