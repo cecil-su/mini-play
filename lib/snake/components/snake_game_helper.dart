@@ -26,6 +26,21 @@ void Function(Map<String, String>) buildSnakeGameOverCallback({
             mode: scoreMode,
             stats: stats,
             replayCallback: onReplay,
+            actions: [
+              GameOverAction(
+                label: 'Play Again',
+                onPressed: onReplay,
+                isPrimary: true,
+              ),
+              GameOverAction(
+                label: 'Choose Mode',
+                onPressed: () => Navigator.pop(context),
+              ),
+              GameOverAction(
+                label: 'Home',
+                onPressed: () {},
+              ),
+            ],
           ),
         ),
       ),

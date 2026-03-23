@@ -167,6 +167,21 @@ class _SudokuPageState extends State<SudokuPage> {
                 '错误': '$_errorCount',
               },
               replayCallback: _replay,
+              actions: [
+                GameOverAction(
+                  label: 'Play Again',
+                  onPressed: _replay,
+                  isPrimary: true,
+                ),
+                GameOverAction(
+                  label: 'Choose Mode',
+                  onPressed: () => Navigator.pop(context),
+                ),
+                GameOverAction(
+                  label: 'Home',
+                  onPressed: () {},
+                ),
+              ],
             ),
           ),
         ),

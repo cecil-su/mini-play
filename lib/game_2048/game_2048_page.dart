@@ -132,6 +132,27 @@ class _Game2048PageState extends State<Game2048Page> {
               });
               _loadBestScore();
             },
+            actions: [
+              GameOverAction(
+                label: 'Play Again',
+                onPressed: () {
+                  setState(() {
+                    _gameKey = UniqueKey();
+                    _createGame();
+                  });
+                  _loadBestScore();
+                },
+                isPrimary: true,
+              ),
+              GameOverAction(
+                label: 'Choose Mode',
+                onPressed: () => Navigator.pop(context),
+              ),
+              GameOverAction(
+                label: 'Home',
+                onPressed: () {},
+              ),
+            ],
           ),
         ),
       ),
