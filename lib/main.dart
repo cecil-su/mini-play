@@ -14,6 +14,9 @@ import 'match3/match3_mode_page.dart';
 import 'match3/match3_page.dart';
 import 'sokoban/sokoban_mode_page.dart';
 import 'sokoban/sokoban_page.dart';
+import 'sudoku/sudoku_cell.dart';
+import 'sudoku/sudoku_mode_page.dart';
+import 'sudoku/sudoku_page.dart';
 import 'tetris/tetris_board.dart';
 import 'tetris/tetris_mode_page.dart';
 import 'tetris/tetris_page.dart';
@@ -126,6 +129,17 @@ class MiniPlayApp extends StatelessWidget {
             return MaterialPageRoute(
               settings: settings,
               builder: (_) => TetrisPage(mode: mode),
+            );
+          case '/sudoku':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const SudokuModePage(),
+            );
+          case '/sudoku/play':
+            final difficulty = settings.arguments as SudokuDifficulty? ?? SudokuDifficulty.easy;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => SudokuPage(difficulty: difficulty),
             );
           default:
             return MaterialPageRoute(

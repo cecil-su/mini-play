@@ -76,6 +76,15 @@ class GameRegistry {
       implemented: true,
       hasModePage: true,
     ),
+    GameInfo(
+      name: 'Sudoku',
+      icon: Icons.grid_3x3,
+      description: '填满9×9网格，每行列宫不重复',
+      phase: 4,
+      route: '/sudoku',
+      implemented: true,
+      hasModePage: true,
+    ),
   ];
 
   static List<GameInfo> byPhase(int phase) =>
