@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../shared/format_time.dart';
 import '../shared/game_over_data.dart';
 import '../shared/game_over_page.dart';
 import '../shared/game_scaffold.dart';
@@ -10,11 +11,6 @@ import '../shared/score_service.dart';
 import 'tetris_board.dart';
 import 'tetris_colors.dart';
 import 'tetris_piece.dart';
-
-String _formatTime(int seconds) {
-  if (seconds < 60) return '$seconds s';
-  return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
-}
 
 class TetrisPage extends StatefulWidget {
   final TetrisGameMode mode;
@@ -30,6 +26,7 @@ class _TetrisPageState extends State<TetrisPage> {
   late TetrisBoard _board;
   final ValueNotifier<int> _scoreNotifier = ValueNotifier<int>(0);
   int _bestScore = 0;
+  int _paintVersion = 0;
   bool _isPaused = false;
   Timer? _dropTimer;
   Timer? _sprintTimer;
@@ -46,18 +43,11 @@ class _TetrisPageState extends State<TetrisPage> {
     }
   }
 
-  String get _scoreMode {
-    switch (widget.mode) {
-      case TetrisGameMode.classic:
-        return 'classic';
-      case TetrisGameMode.sprint:
-        return 'sprint';
-      case TetrisGameMode.marathon:
-        return 'marathon';
-    }
-  }
+  String get _scoreMode => widget.mode.name;
 
   bool get _isSprint => widget.mode == TetrisGameMode.sprint;
+
+  bool get _canPlay => !_isPaused && !_board.isGameOver && !_board.isWon;
 
   @override
   void initState() {
@@ -101,70 +91,65 @@ class _TetrisPageState extends State<TetrisPage> {
   }
 
   void _onTick() {
-    if (_isPaused || _board.isGameOver || _board.isWon) return;
+    if (!_canPlay) return;
 
     final locked = _board.tick();
     if (!_isSprint) {
       _scoreNotifier.value = _board.score;
     }
+    _paintVersion++;
     setState(() {});
 
     if (locked) {
-      // Restart timer with potentially new speed
       _startDropTimer();
     }
 
-    if (_board.isGameOver || _board.isWon) {
-      _dropTimer?.cancel();
-      _sprintTimer?.cancel();
-      // Small delay before showing game over screen
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) _onGameOver();
-      });
-    }
+    _checkGameOver();
+  }
+
+  void _checkGameOver() {
+    if (!_board.isGameOver && !_board.isWon) return;
+    _dropTimer?.cancel();
+    _sprintTimer?.cancel();
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _onGameOver();
+    });
   }
 
   void _moveLeft() {
-    if (_isPaused || _board.isGameOver || _board.isWon) return;
-    if (_board.moveLeft()) setState(() {});
+    if (!_canPlay) return;
+    if (_board.moveLeft()) { _paintVersion++; setState(() {}); }
   }
 
   void _moveRight() {
-    if (_isPaused || _board.isGameOver || _board.isWon) return;
-    if (_board.moveRight()) setState(() {});
+    if (!_canPlay) return;
+    if (_board.moveRight()) { _paintVersion++; setState(() {}); }
   }
 
   void _rotate() {
-    if (_isPaused || _board.isGameOver || _board.isWon) return;
-    if (_board.rotate()) setState(() {});
+    if (!_canPlay) return;
+    if (_board.rotate()) { _paintVersion++; setState(() {}); }
   }
 
   void _softDrop() {
-    if (_isPaused || _board.isGameOver || _board.isWon) return;
+    if (!_canPlay) return;
     if (_board.softDrop()) {
       if (!_isSprint) _scoreNotifier.value = _board.score;
+      _paintVersion++;
       setState(() {});
     }
   }
 
   void _hardDrop() {
-    if (_isPaused || _board.isGameOver || _board.isWon) return;
+    if (!_canPlay) return;
     _board.hardDrop();
     if (!_isSprint) {
       _scoreNotifier.value = _board.score;
     }
+    _paintVersion++;
     setState(() {});
-
-    // Restart drop timer
     _startDropTimer();
-
-    if (_board.isGameOver || _board.isWon) {
-      _dropTimer?.cancel();
-      _sprintTimer?.cancel();
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) _onGameOver();
-      });
-    }
+    _checkGameOver();
   }
 
   Future<void> _onGameOver() async {
@@ -182,15 +167,15 @@ class _TetrisPageState extends State<TetrisPage> {
             await ScoreService().getHighScore('tetris', _scoreMode);
         if (!mounted) return;
         stats = {
-          'Time': _formatTime(_elapsedSeconds),
-          'Best': best == 0 ? '--' : _formatTime(best),
+          'Time': formatTime(_elapsedSeconds),
+          'Best': best == 0 ? '--' : formatTime(best),
           'Lines': '${_board.linesCleared}',
           'Score': '${_board.score}',
         };
       } else {
         if (!mounted) return;
         stats = {
-          'Time': _formatTime(_elapsedSeconds),
+          'Time': formatTime(_elapsedSeconds),
           'Lines': '${_board.linesCleared}/40',
           'Score': '${_board.score}',
         };
@@ -288,9 +273,9 @@ class _TetrisPageState extends State<TetrisPage> {
       bestScore: _bestScore,
       scoreLabel: _isSprint ? 'Time' : 'Score',
       bestLabel: 'Best',
-      scoreFormatter: _isSprint ? _formatTime : null,
+      scoreFormatter: _isSprint ? formatTime : null,
       bestFormatter: _isSprint
-          ? (v) => v == 0 ? '--' : _formatTime(v)
+          ? (v) => v == 0 ? '--' : formatTime(v)
           : null,
       onPause: _onPause,
       onResume: _onResume,
@@ -300,6 +285,7 @@ class _TetrisPageState extends State<TetrisPage> {
         onKeyEvent: _onKeyEvent,
         child: _TetrisGameBody(
           board: _board,
+          paintVersion: _paintVersion,
           onMoveLeft: _moveLeft,
           onMoveRight: _moveRight,
           onRotate: _rotate,
@@ -314,6 +300,7 @@ class _TetrisPageState extends State<TetrisPage> {
 
 class _TetrisGameBody extends StatelessWidget {
   final TetrisBoard board;
+  final int paintVersion;
   final VoidCallback onMoveLeft;
   final VoidCallback onMoveRight;
   final VoidCallback onRotate;
@@ -323,6 +310,7 @@ class _TetrisGameBody extends StatelessWidget {
 
   const _TetrisGameBody({
     required this.board,
+    required this.paintVersion,
     required this.onMoveLeft,
     required this.onMoveRight,
     required this.onRotate,
@@ -378,7 +366,7 @@ class _TetrisGameBody extends StatelessWidget {
               aspectRatio: TetrisBoard.cols / TetrisBoard.rows,
               child: Padding(
                 padding: const EdgeInsets.all(4),
-                child: _BoardWidget(board: board),
+                child: _BoardWidget(board: board, paintVersion: paintVersion),
               ),
             ),
           ),
@@ -471,8 +459,9 @@ class _PreviewPainter extends CustomPainter {
 
 class _BoardWidget extends StatelessWidget {
   final TetrisBoard board;
+  final int paintVersion;
 
-  const _BoardWidget({required this.board});
+  const _BoardWidget({required this.board, required this.paintVersion});
 
   @override
   Widget build(BuildContext context) {
@@ -480,7 +469,7 @@ class _BoardWidget extends StatelessWidget {
       builder: (context, constraints) {
         return CustomPaint(
           size: Size(constraints.maxWidth, constraints.maxHeight),
-          painter: _BoardPainter(board: board),
+          painter: _BoardPainter(board: board, paintVersion: paintVersion),
         );
       },
     );
@@ -489,8 +478,9 @@ class _BoardWidget extends StatelessWidget {
 
 class _BoardPainter extends CustomPainter {
   final TetrisBoard board;
+  final int paintVersion;
 
-  _BoardPainter({required this.board});
+  _BoardPainter({required this.board, required this.paintVersion});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -581,7 +571,8 @@ class _BoardPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _BoardPainter old) => true;
+  bool shouldRepaint(covariant _BoardPainter old) =>
+      paintVersion != old.paintVersion;
 }
 
 class _TouchControls extends StatelessWidget {

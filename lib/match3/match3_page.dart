@@ -24,8 +24,8 @@ class _Match3PageState extends State<Match3Page> with TickerProviderStateMixin {
   Key _gameKey = UniqueKey();
   late Match3Board _board;
   final ValueNotifier<int> _scoreNotifier = ValueNotifier<int>(0);
+  final ValueNotifier<int> _boardTick = ValueNotifier<int>(0);
   int _bestScore = 0;
-  int _score = 0;
   int _movesLeft = 30;
   int _timeLeft = 60;
   Timer? _timer;
@@ -44,16 +44,7 @@ class _Match3PageState extends State<Match3Page> with TickerProviderStateMixin {
   AnimationController? _fallController;
   AnimationController? _removeController;
 
-  String get _modeKey {
-    switch (widget.mode) {
-      case Match3GameMode.classic:
-        return 'classic';
-      case Match3GameMode.timed:
-        return 'timed';
-      case Match3GameMode.moves:
-        return 'moves';
-    }
-  }
+  String get _modeKey => widget.mode.name;
 
   String get _modeTitle {
     switch (widget.mode) {
@@ -75,7 +66,6 @@ class _Match3PageState extends State<Match3Page> with TickerProviderStateMixin {
 
   void _createGame() {
     _board = Match3Board();
-    _score = 0;
     _scoreNotifier.value = 0;
     _movesLeft = 30;
     _timeLeft = 60;
@@ -190,8 +180,7 @@ class _Match3PageState extends State<Match3Page> with TickerProviderStateMixin {
     while (matches.isNotEmpty) {
       // Score
       final points = Match3Board.calculateScore(matches.length, cascadeLevel);
-      _score += points;
-      _scoreNotifier.value = _score;
+      _scoreNotifier.value += points;
 
       // Animate removal
       await _animateRemoval(matches);
@@ -237,7 +226,7 @@ class _Match3PageState extends State<Match3Page> with TickerProviderStateMixin {
       controller: _swapController!,
     );
 
-    _swapController!.addListener(() => setState(() {}));
+    _swapController!.addListener(() => _boardTick.value++);
     await _swapController!.forward();
 
     _gemAnimations.remove(gem1.id);
@@ -258,7 +247,7 @@ class _Match3PageState extends State<Match3Page> with TickerProviderStateMixin {
       }
     }
 
-    _removeController!.addListener(() => setState(() {}));
+    _removeController!.addListener(() => _boardTick.value++);
     await _removeController!.forward();
 
     _removingGemIds.clear();
@@ -299,7 +288,7 @@ class _Match3PageState extends State<Match3Page> with TickerProviderStateMixin {
       );
     }
 
-    _fallController!.addListener(() => setState(() {}));
+    _fallController!.addListener(() => _boardTick.value++);
     await _fallController!.forward();
 
     _gemAnimations.clear();
@@ -316,13 +305,14 @@ class _Match3PageState extends State<Match3Page> with TickerProviderStateMixin {
   }
 
   Future<void> _onGameOver() async {
-    await ScoreService().saveHighScore('match3', _modeKey, _score);
+    final score = _scoreNotifier.value;
+    await ScoreService().saveHighScore('match3', _modeKey, score);
     final best = await ScoreService().getHighScore('match3', _modeKey);
 
     if (!mounted) return;
 
     final stats = <String, String>{
-      'Score': '$_score',
+      'Score': '$score',
       'Best': '$best',
     };
 
@@ -366,6 +356,7 @@ class _Match3PageState extends State<Match3Page> with TickerProviderStateMixin {
   void dispose() {
     _timer?.cancel();
     _scoreNotifier.dispose();
+    _boardTick.dispose();
     _swapController?.dispose();
     _fallController?.dispose();
     _removeController?.dispose();
@@ -387,7 +378,7 @@ class _Match3PageState extends State<Match3Page> with TickerProviderStateMixin {
           // Mode-specific info bar
           _buildInfoBar(),
 
-          // Board
+          // Board — scoped rebuild via ValueListenableBuilder
           Expanded(
             child: Center(
               child: LayoutBuilder(
@@ -406,34 +397,37 @@ class _Match3PageState extends State<Match3Page> with TickerProviderStateMixin {
                       color: Match3Colors.boardBackground,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Stack(
-                      children: [
-                        // Cell backgrounds
-                        for (int r = 0; r < rows; r++)
-                          for (int c = 0; c < cols; c++)
-                            Positioned(
-                              left: c * cellSize,
-                              top: r * cellSize,
-                              child: Container(
-                                width: cellSize,
-                                height: cellSize,
-                                decoration: BoxDecoration(
-                                  color: Match3Colors.cellBackground,
-                                  border: Border.all(
-                                    color: Match3Colors.boardBackground,
-                                    width: 1,
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: _boardTick,
+                      builder: (context, _, __) => Stack(
+                        children: [
+                          // Cell backgrounds
+                          for (int r = 0; r < rows; r++)
+                            for (int c = 0; c < cols; c++)
+                              Positioned(
+                                left: c * cellSize,
+                                top: r * cellSize,
+                                child: Container(
+                                  width: cellSize,
+                                  height: cellSize,
+                                  decoration: BoxDecoration(
+                                    color: Match3Colors.cellBackground,
+                                    border: Border.all(
+                                      color: Match3Colors.boardBackground,
+                                      width: 1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
-                                  borderRadius: BorderRadius.circular(4),
                                 ),
                               ),
-                            ),
 
-                        // Gems
-                        for (int r = 0; r < rows; r++)
-                          for (int c = 0; c < cols; c++)
-                            if (_board.grid[r][c] != null)
-                              _buildGem(r, c, cellSize),
-                      ],
+                          // Gems
+                          for (int r = 0; r < rows; r++)
+                            for (int c = 0; c < cols; c++)
+                              if (_board.grid[r][c] != null)
+                                _buildGem(r, c, cellSize),
+                        ],
+                      ),
                     ),
                   );
                 },

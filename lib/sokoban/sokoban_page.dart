@@ -25,6 +25,7 @@ class _SokobanPageState extends State<SokobanPage> {
   late SokobanBoard _board;
   final ValueNotifier<int> _movesNotifier = ValueNotifier<int>(0);
   int _bestMoves = 0;
+  int _paintVersion = 0;
   bool _isPaused = false;
   final FocusNode _focusNode = FocusNode();
 
@@ -43,6 +44,7 @@ class _SokobanPageState extends State<SokobanPage> {
   }
 
   void _resetLevel() {
+    _paintVersion++;
     setState(() {
       _board.reset(sokobanLevels[_currentLevel]);
       _movesNotifier.value = 0;
@@ -53,6 +55,7 @@ class _SokobanPageState extends State<SokobanPage> {
     if (_isPaused || _board.isWon) return;
     final moved = _board.tryMove(dir);
     if (moved) {
+      _paintVersion++;
       setState(() {
         _movesNotifier.value = _board.moves;
       });
@@ -64,6 +67,7 @@ class _SokobanPageState extends State<SokobanPage> {
 
   void _undo() {
     if (_isPaused || !_board.canUndo) return;
+    _paintVersion++;
     setState(() {
       _board.undo();
       _movesNotifier.value = _board.moves;
@@ -248,6 +252,7 @@ class _SokobanPageState extends State<SokobanPage> {
                           painter: _SokobanPainter(
                             board: _board,
                             cellSize: cellSize,
+                            paintVersion: _paintVersion,
                           ),
                         ),
                       );
@@ -266,8 +271,13 @@ class _SokobanPageState extends State<SokobanPage> {
 class _SokobanPainter extends CustomPainter {
   final SokobanBoard board;
   final double cellSize;
+  final int paintVersion;
 
-  _SokobanPainter({required this.board, required this.cellSize});
+  _SokobanPainter({
+    required this.board,
+    required this.cellSize,
+    required this.paintVersion,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -281,6 +291,20 @@ class _SokobanPainter extends CustomPainter {
       ..color = const Color(0xFFE84545)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
+
+    final wallBorderPaint = Paint()
+      ..color = const Color(0xFF2A2A45)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final boxBorderPaint = Paint()
+      ..color = boxPaint.color.withValues(alpha: 0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final boxOnGoalBorderPaint = Paint()
+      ..color = boxOnGoalPaint.color.withValues(alpha: 0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final innerPaint = Paint()..color = const Color(0xFFFFFFFF);
 
     for (int r = 0; r < board.rows; r++) {
       for (int c = 0; c < board.cols; c++) {
@@ -300,20 +324,14 @@ class _SokobanPainter extends CustomPainter {
         // Draw floor/wall/goal background
         if (cell == CellType.wall) {
           canvas.drawRect(rect, wallPaint);
-          // Wall border for depth
-          final borderPaint = Paint()
-            ..color = const Color(0xFF2A2A45)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1;
-          canvas.drawRect(rect, borderPaint);
+          canvas.drawRect(rect, wallBorderPaint);
         } else {
           canvas.drawRect(rect, isGoal ? goalPaint : floorPaint);
         }
 
         // Draw goal marker
         if (isGoal && !isBox) {
-          final center = rect.center;
-          canvas.drawCircle(center, cellSize * 0.2, goalMarkerPaint);
+          canvas.drawCircle(rect.center, cellSize * 0.2, goalMarkerPaint);
         }
 
         // Draw box
@@ -326,20 +344,14 @@ class _SokobanPainter extends CustomPainter {
             Radius.circular(cellSize * 0.12),
           );
           canvas.drawRRect(rrect, paint);
-          // Box shadow/border
-          final borderPaint = Paint()
-            ..color = paint.color.withValues(alpha: 0.5)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5;
-          canvas.drawRRect(rrect, borderPaint);
+          canvas.drawRRect(
+              rrect, isGoal ? boxOnGoalBorderPaint : boxBorderPaint);
         }
 
         // Draw player
         if (isPlayer) {
           final center = rect.center;
           canvas.drawCircle(center, cellSize * 0.35, playerPaint);
-          // Player inner dot
-          final innerPaint = Paint()..color = const Color(0xFFFFFFFF);
           canvas.drawCircle(center, cellSize * 0.12, innerPaint);
         }
       }
@@ -347,5 +359,7 @@ class _SokobanPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SokobanPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _SokobanPainter oldDelegate) =>
+      paintVersion != oldDelegate.paintVersion ||
+      cellSize != oldDelegate.cellSize;
 }

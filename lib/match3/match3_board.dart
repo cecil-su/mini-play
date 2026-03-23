@@ -23,21 +23,19 @@ class Match3Board {
 
   GemType _randomType() => GemType.values[_random.nextInt(gemTypeCount)];
 
-  /// Fill the board ensuring no initial matches.
+  /// Fill the board ensuring no initial matches and at least one valid move.
   void _fillInitialBoard() {
-    for (int r = 0; r < rows; r++) {
-      for (int c = 0; c < cols; c++) {
-        GemType type;
-        do {
-          type = _randomType();
-        } while (_wouldMatch(r, c, type));
-        grid[r][c] = Gem(type: type, id: _genId());
+    for (int attempt = 0; attempt < 100; attempt++) {
+      for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+          GemType type;
+          do {
+            type = _randomType();
+          } while (_wouldMatch(r, c, type));
+          grid[r][c] = Gem(type: type, id: _genId());
+        }
       }
-    }
-
-    // Ensure there is at least one valid move.
-    if (!hasValidMoves()) {
-      _fillInitialBoard();
+      if (hasValidMoves()) return;
     }
   }
 

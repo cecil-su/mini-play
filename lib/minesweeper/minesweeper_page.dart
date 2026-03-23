@@ -11,10 +11,7 @@ import 'minesweeper_board.dart';
 import 'minesweeper_cell.dart';
 import 'minesweeper_cell_widget.dart';
 
-String formatTime(int seconds) {
-  if (seconds < 60) return '$seconds s';
-  return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
-}
+import '../shared/format_time.dart';
 
 class MinesweeperPage extends StatefulWidget {
   final MinesweeperDifficulty difficulty;
