@@ -55,6 +55,8 @@ class GameRegistry {
       description: 'Rotate and stack falling blocks',
       phase: 2,
       route: '/tetris',
+      implemented: true,
+      hasModePage: true,
     ),
     GameInfo(
       name: 'Match-3',
@@ -62,6 +64,8 @@ class GameRegistry {
       description: 'Swap tiles to match 3 or more',
       phase: 2,
       route: '/match3',
+      implemented: true,
+      hasModePage: true,
     ),
     GameInfo(
       name: 'Sokoban',
@@ -69,6 +73,8 @@ class GameRegistry {
       description: 'Push boxes onto target positions',
       phase: 2,
       route: '/sokoban',
+      implemented: true,
+      hasModePage: true,
     ),
   ];
 

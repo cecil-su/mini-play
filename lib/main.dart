@@ -9,6 +9,14 @@ import 'snake/adaptive/adaptive_game_page.dart';
 import 'snake/classic/classic_game_page.dart';
 import 'snake/free/free_game_page.dart';
 import 'snake/snake_mode_page.dart';
+import 'match3/match3_gem.dart';
+import 'match3/match3_mode_page.dart';
+import 'match3/match3_page.dart';
+import 'sokoban/sokoban_mode_page.dart';
+import 'sokoban/sokoban_page.dart';
+import 'tetris/tetris_board.dart';
+import 'tetris/tetris_mode_page.dart';
+import 'tetris/tetris_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -85,6 +93,39 @@ class MiniPlayApp extends StatelessWidget {
             return MaterialPageRoute(
               settings: settings,
               builder: (_) => MinesweeperPage(difficulty: difficulty),
+            );
+          case '/sokoban':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const SokobanModePage(),
+            );
+          case '/sokoban/play':
+            final levelIndex = settings.arguments as int? ?? 0;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => SokobanPage(levelIndex: levelIndex),
+            );
+          case '/match3':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const Match3ModePage(),
+            );
+          case '/match3/play':
+            final mode = settings.arguments as Match3GameMode? ?? Match3GameMode.classic;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => Match3Page(mode: mode),
+            );
+          case '/tetris':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const TetrisModePage(),
+            );
+          case '/tetris/play':
+            final mode = settings.arguments as TetrisGameMode? ?? TetrisGameMode.classic;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => TetrisPage(mode: mode),
             );
           default:
             return MaterialPageRoute(
