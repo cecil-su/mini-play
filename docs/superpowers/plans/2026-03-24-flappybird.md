@@ -263,7 +263,7 @@ class FlappybirdCollision {
     final closestY = cy.clamp(ry, ry + rh);
     final dx = cx - closestX;
     final dy = cy - closestY;
-    return dx * dx + dy * dy < cr * cr;
+    return dx * dx + dy * dy <= cr * cr;
   }
 }
 ```
@@ -845,7 +845,7 @@ class FlappybirdPainter extends CustomPainter {
     );
     // Scrolling tick marks on grass
     final tickSpacing = 0.03 * h;
-    final offset = (game.ground.offsetX * h) % tickSpacing;
+    final offset = ((game.ground.offsetX * h) % tickSpacing + tickSpacing) % tickSpacing;
     final tickPaint = Paint()
       ..color = FlappybirdColors.groundBottom.withValues(alpha: 0.3)
       ..strokeWidth = 2;
@@ -993,6 +993,8 @@ class _FlappybirdPageState extends State<FlappybirdPage>
   int _paintVersion = 0;
   bool _isPaused = false;
   bool _gameOverHandled = false;
+  bool _deathHapticFired = false;
+  int _lastPipesPassed = 0;
   late Ticker _ticker;
   Duration _lastElapsed = Duration.zero;
 
@@ -1026,6 +1028,8 @@ class _FlappybirdPageState extends State<FlappybirdPage>
     _scoreNotifier.value = 0;
     _lastElapsed = Duration.zero;
     _gameOverHandled = false;
+    _deathHapticFired = false;
+    _lastPipesPassed = 0;
   }
 
   Future<void> _loadBestScore() async {
@@ -1052,12 +1056,14 @@ class _FlappybirdPageState extends State<FlappybirdPage>
     setState(() {});
 
     // Haptic on pipe pass
-    if (_game.pipesPassed > 0 &&
-        _game.pipes.any((p) => p.passed && p.x + p.width >= _game.bird.x - 0.01)) {
-      // Only trigger on the frame the pipe is first passed
+    if (_game.pipesPassed > _lastPipesPassed) {
+      HapticFeedback.lightImpact();
+      _lastPipesPassed = _game.pipesPassed;
     }
 
-    if (_game.state == GameState.dead && !_gameOverHandled) {
+    // Haptic on death (once)
+    if (_game.state == GameState.dead && !_deathHapticFired) {
+      _deathHapticFired = true;
       HapticFeedback.heavyImpact();
     }
 
@@ -1123,7 +1129,7 @@ class _FlappybirdPageState extends State<FlappybirdPage>
               ),
               GameOverAction(
                 label: 'Choose Mode',
-                onPressed: () {},
+                onPressed: () => Navigator.pop(context),
               ),
               GameOverAction(
                 label: 'Home',
@@ -1382,16 +1388,3 @@ Expected: Single new commit for all Flappy Bird files
 
 ---
 
-## Haptic Feedback Note
-
-The haptic feedback for pipe pass (`HapticFeedback.lightImpact()`) should be triggered in `_onTick` when a pipe's `passed` flag changes from false to true. Track this with a `_lastPipesPassed` counter:
-
-```dart
-// In _onTick, after _game.update(dt):
-if (_game.pipesPassed > _lastPipesPassed) {
-  HapticFeedback.lightImpact();
-  _lastPipesPassed = _game.pipesPassed;
-}
-```
-
-Add `int _lastPipesPassed = 0;` as a field in `_FlappybirdPageState`, reset to 0 in `_createGame()`. This belongs in Task 6 (flappybird_page.dart).
