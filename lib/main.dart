@@ -17,6 +17,9 @@ import 'sokoban/sokoban_page.dart';
 import 'sudoku/sudoku_cell.dart';
 import 'sudoku/sudoku_mode_page.dart';
 import 'sudoku/sudoku_page.dart';
+import 'breakout/breakout_config.dart';
+import 'breakout/breakout_mode_page.dart';
+import 'breakout/breakout_page.dart';
 import 'tetris/tetris_board.dart';
 import 'tetris/tetris_mode_page.dart';
 import 'tetris/tetris_page.dart';
@@ -140,6 +143,17 @@ class MiniPlayApp extends StatelessWidget {
             return MaterialPageRoute(
               settings: settings,
               builder: (_) => SudokuPage(difficulty: difficulty),
+            );
+          case '/breakout':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const BreakoutModePage(),
+            );
+          case '/breakout/play':
+            final mode = settings.arguments as BreakoutMode? ?? BreakoutMode.classic;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => BreakoutPage(mode: mode),
             );
           default:
             return MaterialPageRoute(

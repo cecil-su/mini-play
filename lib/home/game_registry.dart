@@ -85,6 +85,15 @@ class GameRegistry {
       implemented: true,
       hasModePage: true,
     ),
+    GameInfo(
+      name: 'Breakout',
+      icon: Icons.sports_tennis,
+      description: 'Break bricks with a ball and paddle',
+      phase: 5,
+      route: '/breakout',
+      implemented: true,
+      hasModePage: true,
+    ),
   ];
 
   static List<GameInfo> byPhase(int phase) =>
