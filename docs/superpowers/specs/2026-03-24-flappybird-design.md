@@ -47,9 +47,9 @@ Pipe
   passed: bool       // 是否已被通过（用于加分）
 
 Cloud
-  x: double          // 水平位置
-  y: double          // 垂直位置（范围 0.05 ~ 0.35）
-  size: double       // 大小（范围 0.03 ~ 0.08）
+  x: double          // 椭圆中心 X 坐标
+  y: double          // 椭圆中心 Y 坐标（范围 0.05 ~ 0.35）
+  radius: double     // 椭圆水平半径（范围 0.03 ~ 0.08），垂直半径 = radius × 0.6
   speed: double      // 滚动速度 = pipeSpeed × 0.3
 
 Ground
@@ -64,7 +64,8 @@ Ground
 ## Pipe Generation
 
 - 首根管道在 `x = worldWidth + 0.1` 处生成
-- 当最后一根管道的 `x < worldWidth - pipeSpacing` 时，在 `x = worldWidth + 0.05` 处生成新管道
+- 后续管道在 `x = lastPipe.x + pipeSpacing` 处生成（精确间距控制）
+- 生成触发条件：当最后一根管道的 `x < worldWidth` 时（即进入屏幕可见区域）
 - `gapCenterY` 在模式对应范围内随机生成，受约束确保上下管道最小高度
 - 管道离开屏幕后回收：`pipe.x + pipe.width < -0.05`
 - 同屏最大管道数约 3-4 根（由间距和速度自然决定）
@@ -76,12 +77,14 @@ Ground
 ```
 每帧更新：
   bird.velocity += gravity × dt
+  bird.velocity = clamp(bird.velocity, -maxVelocity, maxVelocity)  // 先限速再移动
   bird.y += bird.velocity × dt
-  bird.velocity = clamp(bird.velocity, -maxVelocity, maxVelocity)
 
 跳跃时：
   bird.velocity = jumpPower  // 瞬时设为负值（向上）
 ```
+
+无跳跃冷却时间——每次 tap 都立即覆盖当前速度为 jumpPower，与原版 Flappy Bird 一致。
 
 ### Bird Rotation
 
@@ -96,7 +99,7 @@ Ground
 - 在 `flappybird_collision.dart` 中实现独立的 circle-rect 碰撞函数（返回 bool），不依赖 breakout 模块
 - 碰撞优先级：地面 > 管道 > 天花板
 - 碰到地面或管道 → 游戏结束
-- 碰到天花板 → 速度归零弹回（不死亡）
+- 天花板 = y 轴 0.0。当 `bird.y - bird.radius < 0` 时，`bird.y = bird.radius`，`bird.velocity = 0`（停止上升，不反弹，不死亡）
 
 ### Pipe Pass Detection
 
@@ -146,8 +149,8 @@ Ground
 
 ### Score Display
 
-- 分数仅在 Canvas 上绘制（大字号白色带阴影，居中顶部），不使用 GameScaffold 的分数栏
-- GameScaffold 的 `currentScore` 和 `bestScore` 传 null 隐藏分数栏，保持沉浸感
+- 使用 GameScaffold 的分数栏显示分数和最高分（与其他游戏一致）
+- scoreNotifier 绑定实时分数，bestScore 在进入页面时从 ScoreService 加载
 
 ### Draw Order (bottom to top)
 
@@ -156,14 +159,13 @@ Ground
 3. 管道（矩形，绿色渐变，顶部加管帽装饰，管帽圆角半径 0.005）
 4. 地面（棕/绿条纹，无限滚动）
 5. 小鸟（圆形身体 + 三角形翅膀，翅膀按 wingPhase 上下摆动）
-6. HUD（当前分数居中顶部，大字号白色带阴影）
-7. 覆盖层（准备开始提示、游戏结束）
+6. 覆盖层（Ready 状态的 "Tap to Start" 提示，白色字号 0.04 × canvasHeight）
 
 ### Bird Animation
 
-- 翅膀拍动频率：10 rad/s（约 1.6 次/秒）
+- 每帧更新：`wingPhase += 10.0 × dt`（频率 10 rad/s，约 1.6 次/秒）
 - 翅膀振幅：0.01（归一化）
-- Y 偏移 = sin(wingPhase) × amplitude
+- 翅膀三角形相对于鸟身体的垂直偏移 = sin(wingPhase) × amplitude
 - 身体随 rotation 旋转（Canvas.rotate）
 
 ### Pipe Style
@@ -173,8 +175,8 @@ Ground
 
 ### Parallax Effect
 
-- 云朵：游戏开始时生成 4 朵，随机 x（0 ~ worldWidth）、y（0.05 ~ 0.35）、size（0.03 ~ 0.08）
-- 云朵向左滚动，当 `x + size < 0` 时传送到右侧 `x = worldWidth + random(0, 0.1)`
+- 云朵：游戏开始时生成 4 朵，随机 x（0 ~ worldWidth）、y（0.05 ~ 0.35）、radius（0.03 ~ 0.08）
+- 云朵向左滚动，当 `x + radius < 0` 时传送到右侧 `x = worldWidth + radius + random(0, 0.1)`
 - 地面层：与管道同速滚动，用 offsetX 取模实现无缝循环
 
 ### Paint Optimization
@@ -190,7 +192,7 @@ Ready → Playing → Dead → GameOver
 
 - **Ready：** 小鸟在 `(bird.x, 0.4)` 微微上下浮动（振幅 0.02，频率 3 rad/s），显示 "Tap to Start"（白色，字号 0.04 × canvasHeight，居中），管道不动，云朵和地面不滚动
 - **Playing：** 第一次点击后进入，开始物理和滚动
-- **Dead：** 碰撞后进入，管道和地面停止滚动，小鸟以正常重力坠落，旋转锁定 +90°（头朝下）。当 `bird.y + bird.radius >= 1.0 - ground.height` 时转入 GameOver
+- **Dead：** 碰撞后进入，`bird.velocity = 0`（从碰撞点开始坠落），管道和地面停止滚动，小鸟以正常重力坠落，旋转锁定 +90°（头朝下）。当 `bird.y + bird.radius >= 1.0 - ground.height` 时转入 GameOver
 - **GameOver：** 跳转 GameOverPage，显示分数和管道通过数
 
 ## File Structure
