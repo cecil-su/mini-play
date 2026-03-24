@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'breakout_colors.dart';
 import 'breakout_config.dart';
 import 'breakout_game.dart';
-import 'breakout_models.dart';
 
 class BreakoutPainter extends CustomPainter {
   final BreakoutGame game;
