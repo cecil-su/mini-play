@@ -75,6 +75,7 @@ class BreakoutPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(px + (ps - tp.width) / 2, py + (ps - tp.height) / 2));
+      tp.dispose();
     }
 
     // 4. Balls
@@ -138,6 +139,7 @@ class BreakoutPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(size.width - tp.width - 8, size.height - tp.height - 4));
+      tp.dispose();
     }
 
     // HUD - Active power-up timers
@@ -177,6 +179,7 @@ class BreakoutPainter extends CustomPainter {
         (size.width - tp.width) / 2,
         (size.height - tp.height) / 2,
       ));
+      tp.dispose();
     }
 
     // "Tap to launch" hint
@@ -192,6 +195,7 @@ class BreakoutPainter extends CustomPainter {
         (size.width - tp.width) / 2,
         size.height * 0.7,
       ));
+      tp.dispose();
     }
   }
 
@@ -204,6 +208,7 @@ class BreakoutPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout();
     tp.paint(canvas, Offset(x, y));
+    tp.dispose();
   }
 
   @override

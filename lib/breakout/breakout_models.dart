@@ -31,13 +31,6 @@ class Ball {
 
   double get speed => sqrt(vx * vx + vy * vy);
 
-  void setSpeed(double newSpeed) {
-    final currentSpeed = speed;
-    if (currentSpeed == 0) return;
-    final scale = newSpeed / currentSpeed;
-    vx *= scale;
-    vy *= scale;
-  }
 }
 
 class Paddle {
@@ -74,7 +67,6 @@ class Brick {
     this.fadeFrames = 0,
   });
 
-  bool get isDestroyed => hp <= 0 && fadeFrames <= 0;
   bool get isActive => hp > 0;
 
   int get score {

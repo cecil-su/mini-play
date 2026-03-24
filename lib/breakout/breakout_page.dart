@@ -88,11 +88,12 @@ class _BreakoutPageState extends State<BreakoutPage>
     _game.movePaddleByKeys(_keysPressed, dt);
     _game.update(dt);
 
-    // Haptic feedback
+    // Haptic feedback (only trigger once per event, not every frame)
     if (_game.brickHitsThisFrame > 0) {
       HapticFeedback.lightImpact();
     }
-    if (_game.lifeLossPauseTimer > 0.9) {
+    if (_game.lifeLossPauseTimer > 0.99) {
+      // Only fires on the first frame of life loss (timer starts at 1.0)
       HapticFeedback.heavyImpact();
     }
 
@@ -196,18 +197,17 @@ class _BreakoutPageState extends State<BreakoutPage>
             stats: stats,
             replayCallback: _replay,
             title: _game.isWon ? 'You Win!' : null,
+            // Note: game_over_page.dart already calls Navigator.pop before onPressed
+            // so actions must NOT pop themselves (except Home which uses popUntil)
             actions: [
               GameOverAction(
                 label: 'Play Again',
-                onPressed: () {
-                  Navigator.pop(context);
-                  _replay();
-                },
+                onPressed: _replay,
                 isPrimary: true,
               ),
               GameOverAction(
                 label: 'Choose Mode',
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {}, // pop handled by game_over_page.dart
               ),
               GameOverAction(
                 label: 'Home',

@@ -274,6 +274,7 @@ class BreakoutGame {
     if (ball.collidedThisFrame) return;
     for (final brick in bricks) {
       if (!brick.isActive) continue;
+      if (brick.hitThisFrame) continue; // skip bricks already hit (prevents substep duplicate hits)
       final bx = brickX(brick.col);
       final by = brickY(brick.row);
       final result = BreakoutCollision.circleRect(
@@ -287,10 +288,19 @@ class BreakoutGame {
         if (ball.isPenetrating) {
           ball.penetrateHits--;
           if (ball.penetrateHits <= 0) {
+            // Last penetrate hit: bounce off this brick normally
             ball.isPenetrating = false;
+            final (nvx, nvy) = BreakoutCollision.reflect(
+              ball.vx, ball.vy, result.normalX, result.normalY,
+            );
+            ball.vx = nvx;
+            ball.vy = nvy;
+            ball.x += result.normalX * result.overlap;
+            ball.y += result.normalY * result.overlap;
             ball.collidedThisFrame = true;
             return;
           }
+          // Still penetrating: continue checking more bricks
           continue;
         } else {
           final (nvx, nvy) = BreakoutCollision.reflect(
@@ -482,22 +492,24 @@ class BreakoutGame {
   }
 
   void _startNewRound() {
+    // Compute per-round stats BEFORE adding bonus (show brick score only)
+    roundBricksDestroyed = bricksDestroyed - _roundStartBricks;
+    roundScoreGained = score - _roundStartScore;
+
     final bonus = livesLostThisRound ? 100 : 200;
     score += bonus;
 
-    roundBricksDestroyed = bricksDestroyed - _roundStartBricks;
-    roundScoreGained = score - _roundStartScore;
+    // Speed increment uses current round (before increment) for diminishing formula
+    currentBallSpeed = min(
+      currentBallSpeed + config.speedIncrementForRound(round),
+      config.maxBallSpeed,
+    );
 
     round++;
     livesLostThisRound = false;
 
     _roundStartBricks = bricksDestroyed;
     _roundStartScore = score;
-
-    currentBallSpeed = min(
-      currentBallSpeed + config.speedIncrementForRound(round),
-      config.maxBallSpeed,
-    );
 
     widenTimer = 0;
     shrinkTimer = 0;
@@ -529,23 +541,4 @@ class BreakoutGame {
     }
   }
 
-  // --- Reset for replay ---
-
-  void reset() {
-    lives = config.lives;
-    score = 0;
-    bricksDestroyed = 0;
-    round = 1;
-    livesLostThisRound = false;
-    currentBallSpeed = config.ballSpeed;
-    isGameOver = false;
-    isWon = false;
-    widenTimer = 0;
-    shrinkTimer = 0;
-    penetrateTimer = 0;
-    activePowerUps.clear();
-    _initPaddle();
-    _generateBricks();
-    _spawnBallOnPaddle();
-  }
 }
