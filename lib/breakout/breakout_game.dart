@@ -472,7 +472,7 @@ class BreakoutGame {
   // --- Round / life management ---
 
   void _checkRoundComplete() {
-    if (bricks.every((b) => b.isDestroyed)) {
+    if (bricks.every((b) => !b.isActive)) {
       if (mode == BreakoutMode.endless) {
         _startNewRound();
       } else {
