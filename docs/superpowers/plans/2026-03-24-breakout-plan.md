@@ -19,7 +19,7 @@
 | `lib/breakout/breakout_config.dart` | `BreakoutMode` enum + `BreakoutConfig` class with per-mode parameters |
 | `lib/breakout/breakout_models.dart` | Data models: `Ball`, `Paddle`, `Brick`, `PowerUp`, `PowerUpType` |
 | `lib/breakout/breakout_colors.dart` | Color constants for bricks, power-ups, paddle, background |
-| `lib/breakout/breakout_collision.dart` | Collision detection: circle-rect, overlap resolution, wall/paddle/brick |
+| `lib/breakout/breakout_collision.dart` | Collision detection: circle-rect, reflect, rect-rect |
 | `lib/breakout/breakout_game.dart` | Core game logic: state, physics loop, power-up system, scoring, life/round management |
 | `lib/breakout/breakout_painter.dart` | `CustomPainter` subclass: draws all game elements, HUD, visual effects |
 | `lib/breakout/breakout_page.dart` | `StatefulWidget`: Ticker loop, input handling, GameScaffold integration, game over flow |
@@ -191,6 +191,7 @@ class Brick {
   final int maxHp;
   bool hitThisFrame;
   int flashFrames; // for visual hit feedback
+  int fadeFrames;  // for destruction fade-out (3 frames)
 
   Brick({
     required this.row,
@@ -199,9 +200,11 @@ class Brick {
     required this.maxHp,
     this.hitThisFrame = false,
     this.flashFrames = 0,
+    this.fadeFrames = 0,
   });
 
-  bool get isDestroyed => hp <= 0;
+  bool get isDestroyed => hp <= 0 && fadeFrames <= 0;
+  bool get isActive => hp > 0; // still hittable
 
   int get score {
     switch (maxHp) {
@@ -387,17 +390,6 @@ class BreakoutCollision {
     );
   }
 
-  /// Resolve ball position after collision: push ball out along normal
-  static void resolveOverlap(
-    double Function() getX, void Function(double) setX,
-    double Function() getY, void Function(double) setY,
-    CollisionResult result,
-  ) {
-    if (!result.hit || result.overlap <= 0) return;
-    setX(getX() + result.normalX * result.overlap);
-    setY(getY() + result.normalY * result.overlap);
-  }
-
   /// Reflect velocity around collision normal
   static (double, double) reflect(double vx, double vy, double nx, double ny) {
     final dot = vx * nx + vy * ny;
@@ -433,9 +425,27 @@ git commit -m "feat(breakout): add collision detection with overlap resolution"
 **Files:**
 - Create: `lib/breakout/breakout_game.dart`
 
-This is the largest file (~300-350 lines). It manages game state, physics, power-ups, scoring, and life/round management.
+This is the largest file (~350 lines). It manages game state, physics, power-ups, scoring, and life/round management. Split into substeps for manageability.
 
-- [ ] **Step 1: Create breakout_game.dart**
+**Note:** Individual file compilation (`flutter analyze lib/breakout/...`) works per-task. Full-app compilation (`flutter analyze` without file target) will only pass after Task 8 wires up routing.
+
+- [ ] **Step 1: Create breakout_game.dart — class skeleton, initialization, paddle, ball launch**
+
+Write the file with: class declaration, all fields and constants, constructor, `_initPaddle`, `_spawnBallOnPaddle`, `_generateBricks`, `_randomHp`, brick geometry helpers, `launchBall`, `movePaddleRelative`, `movePaddleByKeys`, `_clampPaddlePosition`, and `reset`.
+
+- [ ] **Step 2: Add update loop, ball physics, and collision**
+
+Add to the same file: `update`, `_updateBall`, `_moveBallStep`, `_collideBall` (walls, paddle, bricks with penetrating ball support), `_processBrickDamage`.
+
+- [ ] **Step 3: Add power-up system**
+
+Add to the same file: `_trySpawnPowerUp`, `_randomPowerUpType`, `_updatePowerUps`, `_activatePowerUp`, `_updatePowerUpTimers`.
+
+- [ ] **Step 4: Add round/life management**
+
+Add to the same file: `_checkRoundComplete`, `_startNewRound`, `_checkGameOver`, `effectiveMultiplier` getter.
+
+The complete file contents (all substeps combined):
 
 ```dart
 // lib/breakout/breakout_game.dart
@@ -474,8 +484,13 @@ class BreakoutGame {
   // Visual effect state
   double lifeLossPauseTimer = 0;
   int paddleSquashFrames = 0;
+  int paddleFlashFrames = 0; // flash on power-up activation
   String? roundOverlayText;
   double roundOverlayTimer = 0;
+
+  // Per-round tracking for round overlay stats
+  int _roundStartBricks = 0;
+  int _roundStartScore = 0;
 
   // Scoring
   double get effectiveMultiplier {
@@ -576,7 +591,7 @@ class BreakoutGame {
     }
   }
 
-  void movePaddleByKeys(Set<dynamic> keysPressed, double dt) {
+  void movePaddleByKeys(Set<String> keysPressed, double dt) {
     if (isGameOver || isWon) return;
     double dx = 0;
     // Keys are checked externally, this receives direction
@@ -592,9 +607,10 @@ class BreakoutGame {
   void update(double dt) {
     if (isGameOver || isWon) return;
 
-    // Life loss pause
+    // Life loss pause (power-up timers still tick per spec)
     if (lifeLossPauseTimer > 0) {
       lifeLossPauseTimer -= dt;
+      _updatePowerUpTimers(dt);
       return;
     }
 
@@ -613,8 +629,12 @@ class BreakoutGame {
     // Update visual effects
     for (final brick in bricks) {
       if (brick.flashFrames > 0) brick.flashFrames--;
+      if (brick.hp <= 0 && brick.fadeFrames > 0) brick.fadeFrames--;
     }
+    // Remove fully faded bricks
+    bricks.removeWhere((b) => b.hp <= 0 && b.fadeFrames <= 0);
     if (paddleSquashFrames > 0) paddleSquashFrames--;
+    if (paddleFlashFrames > 0) paddleFlashFrames--;
 
     // Move and collide each ball (with tunneling subdivision)
     for (final ball in balls) {
@@ -709,7 +729,7 @@ class BreakoutGame {
     // 5. Brick collision
     if (ball.collidedThisFrame) return;
     for (final brick in bricks) {
-      if (brick.isDestroyed) continue;
+      if (!brick.isActive) continue;
       final bx = brickX(brick.col);
       final by = brickY(brick.row);
       final result = BreakoutCollision.circleRect(
@@ -724,8 +744,11 @@ class BreakoutGame {
           ball.penetrateHits--;
           if (ball.penetrateHits <= 0) {
             ball.isPenetrating = false;
+            ball.collidedThisFrame = true;
+            return; // lost penetration, stop
           }
-          // Don't bounce, continue through
+          // Still penetrating: continue checking more bricks
+          continue;
         } else {
           // Reflect velocity
           final (nvx, nvy) = BreakoutCollision.reflect(
@@ -736,9 +759,9 @@ class BreakoutGame {
           // Reposition
           ball.x += result.normalX * result.overlap;
           ball.y += result.normalY * result.overlap;
+          ball.collidedThisFrame = true;
+          return;
         }
-        ball.collidedThisFrame = true;
-        return;
       }
     }
   }
@@ -758,6 +781,7 @@ class BreakoutGame {
     }
 
     for (final brick in destroyedBricks) {
+      brick.fadeFrames = 3; // fade-out animation
       score += (brick.score * effectiveMultiplier).round();
       bricksDestroyed++;
       _trySpawnPowerUp(brick);
@@ -828,17 +852,27 @@ class BreakoutGame {
     activePowerUps.removeWhere(toRemove.contains);
   }
 
+  void _clampPaddlePosition() {
+    paddle.x = paddle.x.clamp(
+      paddle.width / 2,
+      BreakoutConfig.worldWidth - paddle.width / 2,
+    );
+  }
+
   void _activatePowerUp(PowerUpType type) {
+    paddleFlashFrames = 3; // visual feedback for any power-up activation
     switch (type) {
       case PowerUpType.widen:
         shrinkTimer = 0; // override shrink
         widenTimer = 8.0;
         paddle.width = paddle.baseWidth * 2;
+        _clampPaddlePosition();
         break;
       case PowerUpType.shrink:
         widenTimer = 0; // override widen
         shrinkTimer = 8.0;
         paddle.width = paddle.baseWidth * 0.5;
+        _clampPaddlePosition();
         break;
       case PowerUpType.multiBall:
         if (balls.length < maxBalls) {
@@ -913,12 +947,16 @@ class BreakoutGame {
     final bonus = livesLostThisRound ? 100 : 200;
     score += bonus;
 
-    // Save round stats for overlay
-    roundBricksDestroyed = bricksDestroyed; // cumulative shown per round
-    roundScoreGained = score; // will diff with pre-round score later if needed
+    // Compute per-round stats for overlay
+    roundBricksDestroyed = bricksDestroyed - _roundStartBricks;
+    roundScoreGained = score - _roundStartScore;
 
     round++;
     livesLostThisRound = false;
+
+    // Track start of new round for next delta
+    _roundStartBricks = bricksDestroyed;
+    _roundStartScore = score;
 
     // Increase speed
     currentBallSpeed = min(
@@ -943,6 +981,8 @@ class BreakoutGame {
   }
 
   void _checkGameOver() {
+    if (isWon) return; // don't penalize after winning
+
     // Remove out-of-bounds balls
     balls.removeWhere((b) => b.y > BreakoutConfig.worldHeight);
 
@@ -980,12 +1020,12 @@ class BreakoutGame {
 }
 ```
 
-- [ ] **Step 2: Verify compiles**
+- [ ] **Step 5: Verify compiles**
 
 Run: `cd D:/Workspace/ai/mini-play && fvm flutter analyze lib/breakout/breakout_game.dart`
 Expected: No errors
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add lib/breakout/breakout_game.dart
@@ -1027,9 +1067,8 @@ class BreakoutPainter extends CustomPainter {
       Paint()..color = BreakoutColors.background,
     );
 
-    // 2. Bricks
+    // 2. Bricks (including fading-out destroyed bricks)
     for (final brick in game.bricks) {
-      if (brick.isDestroyed) continue;
       final bx = game.brickX(brick.col) * s;
       final by = game.brickY(brick.row) * s;
       final bw = game.brickWidth * s;
@@ -1039,22 +1078,30 @@ class BreakoutPainter extends CustomPainter {
         const Radius.circular(3),
       );
 
+      // Fade-out for destroyed bricks
+      double opacity = 1.0;
+      if (brick.hp <= 0 && brick.fadeFrames > 0) {
+        opacity = brick.fadeFrames / 3.0;
+      }
+
       Color color;
       if (brick.flashFrames > 0) {
-        color = Colors.white;
+        color = Colors.white.withValues(alpha: opacity);
       } else {
-        color = BreakoutColors.forBrick(brick.hp, brick.maxHp);
+        color = BreakoutColors.forBrick(brick.hp > 0 ? brick.hp : 1, brick.maxHp).withValues(alpha: opacity);
       }
       canvas.drawRRect(rect, Paint()..color = color);
 
       // Subtle border
-      canvas.drawRRect(
-        rect,
-        Paint()
-          ..color = Colors.white.withValues(alpha: 0.15)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 0.5,
-      );
+      if (opacity > 0.5) {
+        canvas.drawRRect(
+          rect,
+          Paint()
+            ..color = Colors.white.withValues(alpha: 0.15 * opacity)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 0.5,
+        );
+      }
     }
 
     // 3. Power-ups
@@ -1101,11 +1148,16 @@ class BreakoutPainter extends CustomPainter {
     }
 
     // 5. Paddle
-    final paddleColor = game.widenTimer > 0
-        ? BreakoutColors.paddleWiden
-        : game.shrinkTimer > 0
-            ? BreakoutColors.paddleShrink
-            : BreakoutColors.paddle;
+    final Color paddleColor;
+    if (game.paddleFlashFrames > 0) {
+      paddleColor = Colors.white; // flash on power-up activation
+    } else if (game.widenTimer > 0) {
+      paddleColor = BreakoutColors.paddleWiden;
+    } else if (game.shrinkTimer > 0) {
+      paddleColor = BreakoutColors.paddleShrink;
+    } else {
+      paddleColor = BreakoutColors.paddle;
+    }
     final squash = game.paddleSquashFrames > 0 ? 0.7 : 1.0;
     final pw = game.paddle.width * s;
     final ph = game.paddle.height * s * squash;
@@ -1141,15 +1193,15 @@ class BreakoutPainter extends CustomPainter {
     // HUD - Active power-up timers
     double timerX = lifeRadius + 2 + game.lives * (lifeRadius * 2 + 4) + 8;
     if (game.widenTimer > 0) {
-      _drawTimerBadge(canvas, timerX, size.height - 16, '↔ ${game.widenTimer.ceil()}s', BreakoutColors.paddleWiden, s);
+      _drawTimerBadge(canvas, timerX, size.height - 16, '↔ ${game.widenTimer.ceil()}s', BreakoutColors.paddleWiden);
       timerX += 50;
     }
     if (game.shrinkTimer > 0) {
-      _drawTimerBadge(canvas, timerX, size.height - 16, '↕ ${game.shrinkTimer.ceil()}s', BreakoutColors.paddleShrink, s);
+      _drawTimerBadge(canvas, timerX, size.height - 16, '↕ ${game.shrinkTimer.ceil()}s', BreakoutColors.paddleShrink);
       timerX += 50;
     }
     if (game.penetrateTimer > 0) {
-      _drawTimerBadge(canvas, timerX, size.height - 16, '↓ ${game.penetrateTimer.ceil()}s', BreakoutColors.ballPenetrating, s);
+      _drawTimerBadge(canvas, timerX, size.height - 16, '↓ ${game.penetrateTimer.ceil()}s', BreakoutColors.ballPenetrating);
     }
 
     // Life loss flash overlay
@@ -1193,7 +1245,7 @@ class BreakoutPainter extends CustomPainter {
     }
   }
 
-  void _drawTimerBadge(Canvas canvas, double x, double y, String text, Color color, double s) {
+  void _drawTimerBadge(Canvas canvas, double x, double y, String text, Color color) {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
@@ -1255,13 +1307,14 @@ class BreakoutPage extends StatefulWidget {
 }
 
 class _BreakoutPageState extends State<BreakoutPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   Key _gameKey = UniqueKey();
   late BreakoutGame _game;
   final ValueNotifier<int> _scoreNotifier = ValueNotifier<int>(0);
   int _bestScore = 0;
   int _paintVersion = 0;
   bool _isPaused = false;
+  bool _gameOverHandled = false;
   late Ticker _ticker;
   Duration _lastElapsed = Duration.zero;
   int _elapsedSeconds = 0;
@@ -1297,6 +1350,7 @@ class _BreakoutPageState extends State<BreakoutPage>
     _scoreNotifier.value = 0;
     _lastElapsed = Duration.zero;
     _keysPressed.clear();
+    _gameOverHandled = false;
   }
 
   Future<void> _loadBestScore() async {
@@ -1322,19 +1376,23 @@ class _BreakoutPageState extends State<BreakoutPage>
     // Update game
     _game.update(dt);
 
-    // Track time
-    _elapsedAccumulator += dt;
-    if (_elapsedAccumulator >= 1.0) {
-      _elapsedSeconds += _elapsedAccumulator.floor();
-      _elapsedAccumulator %= 1.0;
+    // Track time (exclude pauses inside game: lifeLoss, roundOverlay)
+    if (_game.lifeLossPauseTimer <= 0 && _game.roundOverlayTimer <= 0 && !_game.waitingToLaunch) {
+      _elapsedAccumulator += dt;
+      if (_elapsedAccumulator >= 1.0) {
+        _elapsedSeconds += _elapsedAccumulator.floor();
+        _elapsedAccumulator %= 1.0;
+      }
     }
 
     _scoreNotifier.value = _game.score;
     _paintVersion++;
     setState(() {});
 
-    // Check game over
-    if (_game.isGameOver || _game.isWon) {
+    // Check game over (with guard to prevent multiple pushes)
+    if ((_game.isGameOver || _game.isWon) && !_gameOverHandled) {
+      _gameOverHandled = true;
+      _ticker.stop();
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) _onGameOver();
       });
@@ -1424,7 +1482,10 @@ class _BreakoutPageState extends State<BreakoutPage>
             actions: [
               GameOverAction(
                 label: 'Play Again',
-                onPressed: _replay,
+                onPressed: () {
+                  Navigator.pop(context); // pop GameOverPage first
+                  _replay();
+                },
                 isPrimary: true,
               ),
               GameOverAction(
@@ -1433,7 +1494,7 @@ class _BreakoutPageState extends State<BreakoutPage>
               ),
               GameOverAction(
                 label: 'Home',
-                onPressed: () {},
+                onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
               ),
             ],
           ),
@@ -1446,11 +1507,13 @@ class _BreakoutPageState extends State<BreakoutPage>
     setState(() {
       _gameKey = UniqueKey();
       _createGame();
-      // Restart ticker (dispose old one to prevent leaks)
-      _ticker.stop();
-      _ticker.dispose();
-      _ticker = createTicker(_onTick);
-      _ticker.start();
+      // Restart ticker (reuse via stop/start, reset elapsed tracking)
+      if (!_ticker.isActive) {
+        _ticker.stop();
+        _ticker.dispose();
+        _ticker = createTicker(_onTick);
+        _ticker.start();
+      }
     });
     _loadBestScore();
   }
