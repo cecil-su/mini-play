@@ -21,13 +21,29 @@ Three modes, consistent with the existing mode pattern:
 | Power-up drop rate | 20% | 15% | 25% |
 | Score multiplier | 1.0x | 1.5x | 1.0x (x round number) |
 | End condition | Clear all bricks | Clear all bricks | All lives lost |
-| Negative power-ups | Yes | No | Yes |
+| Negative power-ups | Yes | No (shrink excluded from pool) | Yes |
 
 ### Brick HP Distribution Per Round
 
 - **Classic:** 70% HP 1, 30% HP 2
 - **Hard:** 40% HP 1, 40% HP 2, 20% HP 3
 - **Endless:** 70% HP 1, 30% HP 2
+
+### Endless Mode Round Transitions
+
+When all bricks are cleared in Endless mode:
+1. Ball is removed, new ball placed on paddle (waiting for launch)
+2. Round counter increments, ball speed increases by `speedIncrement`
+3. New brick grid is generated
+4. Active timed power-ups (widen, shrink, penetrate) are cleared; extra balls from multi-ball are removed
+5. Lives and score carry over
+6. Brief 1-second "Round X" text overlay before player launches ball
+
+### Win/Loss Titles
+
+- Classic/Hard: clear all bricks -> `GameOverData(title: "You Win!")` (green victory text)
+- Classic/Hard: lose all lives -> `GameOverData(title: null)` (default "Game Over")
+- Endless: always `GameOverData(title: null)` (default "Game Over")
 
 ## Architecture and File Structure
 
@@ -63,8 +79,9 @@ Timer.periodic(16ms ~ 60fps)
 - `ScoreService`: stores high scores, key format `highscore_breakout_{mode}`
 - `GameOverPage`: shows results with stats
 - `GameModeCard`: used on mode selection page
-- Routes: `/breakout` -> mode page, `/breakout/play` -> game page (receives mode enum)
-- `game_registry.dart`: add Breakout entry
+- Routes: `/breakout` -> mode page, `/breakout/play` -> game page
+  - In `onGenerateRoute`: `final mode = settings.arguments as BreakoutMode? ?? BreakoutMode.classic`
+- `game_registry.dart`: add Breakout entry (phase: 5)
 
 ## Data Models
 
@@ -123,7 +140,8 @@ Score per brick = full-HP base score value.
 
 - Per frame: `x += vx * dt`, `y += vy * dt`
 - Initial launch angle: random -30 to +30 degrees (upward)
-- Ball speed is scalar `speed`, vx/vy maintain direction vector, `vx^2 + vy^2 = speed^2`
+- Ball speed is scalar `speed` (magnitude of velocity vector relative to canvas height per second), `vx^2 + vy^2 = speed^2`
+- Example: speed 0.6 means the ball traverses 60% of the canvas height per second (~1.67s to cross vertically)
 
 ### Collision Detection (per frame, in priority order)
 
@@ -176,7 +194,7 @@ Score per brick = full-HP base score value.
 
 ### Conflict Resolution
 
-- Widen + Shrink: later one overrides, timer resets
+- Widen + Shrink: later one overrides previous, timer resets. All width multipliers apply to the **original** base paddle width (not current width)
 - Same power-up repeated: refresh duration, no stacking
 - Penetrating ball applies to all active balls
 
@@ -207,7 +225,8 @@ Score per brick = full-HP base score value.
 
 ### Keyboard
 
-- `RawKeyboardListener` listens for left/right arrows + A/D keys
+- `Focus` widget with `onKeyEvent` callback (modern API, consistent with Tetris implementation)
+- Listens for left/right arrows + A/D keys
 - Hold to move paddle each frame, speed matches ball speed
 
 ### Ball Launch
@@ -219,6 +238,7 @@ Score per brick = full-HP base score value.
 ### Pause
 
 - `GameScaffold` provides pause button, sets `isPaused` flag
+- `canPause` callback: returns `true` when game is active, `false` when game is over (prevents pausing a finished game)
 - When `isPaused`, Timer callback skips `update()`
 - App background auto-pauses (built into `GameScaffold`)
 - All input ignored during pause
@@ -243,8 +263,10 @@ Score per brick = full-HP base score value.
 
 ### Adaptive Layout
 
-- Game area maintains fixed aspect ratio (3:4), centered on screen
-- Normalized coordinates -> multiply by actual canvas size
+- Game area uses `Center` + `AspectRatio(aspectRatio: 3/4)` widget wrapping the `CustomPaint`
+- This sits inside `GameScaffold`'s `Expanded` child area (below the top bar)
+- Normalized coordinates -> multiply by actual canvas size (the AspectRatio widget's size)
+- HUD (lives, power-up timers) is drawn inside the CustomPainter, so it is covered by pause overlay (acceptable)
 - Works in both landscape and portrait, portrait is optimal
 
 ## Mode Configuration
@@ -252,13 +274,18 @@ Score per brick = full-HP base score value.
 ```dart
 class BreakoutConfig {
   final int lives;
-  final double ballSpeed;        // Normalized speed (canvas proportion per second)
-  final double paddleWidth;      // Normalized width
+  final double ballSpeed;        // Normalized speed (canvas height per second)
+  final double paddleWidth;      // Normalized width (fraction of canvas width)
   final int brickRows;
-  final int brickCols = 8;      // Fixed 8 columns
+  static const int brickCols = 8; // Fixed 8 columns for all modes
   final int maxBrickHp;         // Max brick durability
-  final double powerUpChance;   // Drop probability
-  final double speedIncrement;  // Endless mode speed increase per round
+  final double powerUpChance;   // Drop probability (0.0-1.0)
+  final bool hasNegativePowerUps; // Whether shrink power-up is in the pool
+  final double speedIncrement;  // Endless mode ball speed increase per round
   final double scoreMultiplier; // Score multiplier
 }
 ```
+
+### Timer vs Ticker Fallback
+
+Primary approach: `Timer.periodic(Duration(milliseconds: 16), ...)` for ~60fps game loop, consistent with Tetris. If animation smoothness is poor on web, fallback to `Ticker` via `SingleTickerProviderStateMixin` which ties to the display refresh rate.
