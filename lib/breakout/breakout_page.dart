@@ -88,6 +88,14 @@ class _BreakoutPageState extends State<BreakoutPage>
     _game.movePaddleByKeys(_keysPressed, dt);
     _game.update(dt);
 
+    // Haptic feedback
+    if (_game.brickHitsThisFrame > 0) {
+      HapticFeedback.lightImpact();
+    }
+    if (_game.lifeLossPauseTimer > 0.9) {
+      HapticFeedback.heavyImpact();
+    }
+
     if (_game.lifeLossPauseTimer <= 0 && _game.roundOverlayTimer <= 0 && !_game.waitingToLaunch) {
       _elapsedAccumulator += dt;
       if (_elapsedAccumulator >= 1.0) {
