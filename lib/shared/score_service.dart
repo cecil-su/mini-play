@@ -12,6 +12,11 @@ class ScoreService {
     return prefs.getInt(_key(game, mode)) ?? 0;
   }
 
+  Future<bool> hasScore(String game, String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.containsKey(_key(game, mode));
+  }
+
   Future<void> saveHighScore(String game, String mode, int score, {bool lowerIsBetter = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final current = prefs.getInt(_key(game, mode)) ?? 0;

@@ -51,5 +51,16 @@ void main() {
       await service.saveHighScore('minesweeper', 'beginner', 42, lowerIsBetter: true);
       expect(await service.getHighScore('minesweeper', 'beginner'), 42);
     });
+
+    test('hasScore returns false for no saved score', () async {
+      final service = ScoreService();
+      expect(await service.hasScore('klotski', 'level_0'), false);
+    });
+
+    test('hasScore returns true after saving score', () async {
+      final service = ScoreService();
+      await service.saveHighScore('klotski', 'level_0', 50, lowerIsBetter: true);
+      expect(await service.hasScore('klotski', 'level_0'), true);
+    });
   });
 }

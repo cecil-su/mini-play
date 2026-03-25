@@ -23,6 +23,8 @@ import 'breakout/breakout_page.dart';
 import 'flappybird/flappybird_config.dart';
 import 'flappybird/flappybird_mode_page.dart';
 import 'flappybird/flappybird_page.dart';
+import 'klotski/klotski_mode_page.dart';
+import 'klotski/klotski_page.dart';
 import 'tetris/tetris_board.dart';
 import 'tetris/tetris_mode_page.dart';
 import 'tetris/tetris_page.dart';
@@ -168,6 +170,17 @@ class MiniPlayApp extends StatelessWidget {
             return MaterialPageRoute(
               settings: settings,
               builder: (_) => FlappybirdPage(mode: mode),
+            );
+          case '/klotski':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const KlotskiModePage(),
+            );
+          case '/klotski/play':
+            final levelIndex = settings.arguments as int? ?? 0;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => KlotskiPage(levelIndex: levelIndex),
             );
           default:
             return MaterialPageRoute(

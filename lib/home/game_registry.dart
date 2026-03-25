@@ -103,6 +103,15 @@ class GameRegistry {
       implemented: true,
       hasModePage: true,
     ),
+    GameInfo(
+      name: 'Klotski',
+      icon: Icons.view_compact,
+      description: '华容道 - 滑动方块，释放曹操',
+      phase: 6,
+      route: '/klotski',
+      implemented: true,
+      hasModePage: true,
+    ),
   ];
 
   static List<GameInfo> byPhase(int phase) =>
