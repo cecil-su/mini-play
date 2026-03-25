@@ -20,6 +20,9 @@ import 'sudoku/sudoku_page.dart';
 import 'breakout/breakout_config.dart';
 import 'breakout/breakout_mode_page.dart';
 import 'breakout/breakout_page.dart';
+import 'flappybird/flappybird_config.dart';
+import 'flappybird/flappybird_mode_page.dart';
+import 'flappybird/flappybird_page.dart';
 import 'tetris/tetris_board.dart';
 import 'tetris/tetris_mode_page.dart';
 import 'tetris/tetris_page.dart';
@@ -154,6 +157,17 @@ class MiniPlayApp extends StatelessWidget {
             return MaterialPageRoute(
               settings: settings,
               builder: (_) => BreakoutPage(mode: mode),
+            );
+          case '/flappybird':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const FlappybirdModePage(),
+            );
+          case '/flappybird/play':
+            final mode = settings.arguments as FlappybirdMode? ?? FlappybirdMode.normal;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => FlappybirdPage(mode: mode),
             );
           default:
             return MaterialPageRoute(

@@ -94,6 +94,15 @@ class GameRegistry {
       implemented: true,
       hasModePage: true,
     ),
+    GameInfo(
+      name: 'Flappy Bird',
+      icon: Icons.flutter_dash,
+      description: 'Tap to fly through gaps between pipes',
+      phase: 3,
+      route: '/flappybird',
+      implemented: true,
+      hasModePage: true,
+    ),
   ];
 
   static List<GameInfo> byPhase(int phase) =>
