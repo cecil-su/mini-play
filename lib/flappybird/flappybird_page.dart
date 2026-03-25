@@ -211,7 +211,9 @@ class _FlappybirdPageState extends State<FlappybirdPage>
       bestScore: _bestScore,
       onPause: _onPause,
       onResume: _onResume,
-      canPause: () => _game.state == GameState.ready || _game.state == GameState.playing,
+      canPause: () => _game.state == GameState.ready ||
+          _game.state == GameState.playing ||
+          _game.state == GameState.dead,
       child: Focus(
         autofocus: true,
         onKeyEvent: _onKeyEvent,
