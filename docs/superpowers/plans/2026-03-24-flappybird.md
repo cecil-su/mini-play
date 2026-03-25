@@ -60,8 +60,8 @@ class FlappybirdConfig {
     switch (mode) {
       case FlappybirdMode.easy:
         return const FlappybirdConfig(
-          gravity: 1.2,
-          jumpPower: -0.45,
+          gravity: 0.9,
+          jumpPower: -0.50,
           maxVelocity: 1.0,
           pipeSpacing: 0.55,
           gapSize: 0.28,
@@ -71,8 +71,8 @@ class FlappybirdConfig {
         );
       case FlappybirdMode.normal:
         return const FlappybirdConfig(
-          gravity: 1.6,
-          jumpPower: -0.5,
+          gravity: 1.4,
+          jumpPower: -0.55,
           maxVelocity: 1.2,
           pipeSpacing: 0.45,
           gapSize: 0.22,
@@ -82,14 +82,14 @@ class FlappybirdConfig {
         );
       case FlappybirdMode.hard:
         return const FlappybirdConfig(
-          gravity: 2.0,
-          jumpPower: -0.55,
+          gravity: 2.2,
+          jumpPower: -0.58,
           maxVelocity: 1.5,
-          pipeSpacing: 0.35,
-          gapSize: 0.18,
+          pipeSpacing: 0.38,
+          gapSize: 0.20,
           pipeSpeed: 0.45,
           gapMinY: 0.12,
-          gapMaxY: 0.78,
+          gapMaxY: 0.74,
         );
     }
   }
@@ -361,7 +361,7 @@ void main() {
 
     test('bird starts at correct position', () {
       expect(game.bird.x, closeTo(FlappybirdConfig.birdX, 0.001));
-      expect(game.bird.y, closeTo(0.4, 0.001));
+      expect(game.bird.y, closeTo(0.35, 0.001));
       expect(game.bird.velocity, 0);
     });
 
@@ -528,7 +528,7 @@ class FlappybirdGame {
   double _bobPhase = 0;
 
   FlappybirdGame({required this.config}) {
-    bird = Bird(x: FlappybirdConfig.birdX, y: 0.4);
+    bird = Bird(x: FlappybirdConfig.birdX, y: 0.35);
     _initClouds();
   }
 
@@ -551,10 +551,11 @@ class FlappybirdGame {
       _spawnFirstPipe();
     }
     bird.velocity = config.jumpPower;
+    bird.wingPhase += 1.0; // flap on jump
   }
 
   void _spawnFirstPipe() {
-    pipes.add(_createPipe(FlappybirdConfig.worldWidth + 0.1));
+    pipes.add(_createPipe(FlappybirdConfig.worldWidth + 0.4));
   }
 
   Pipe _createPipe(double x) {
@@ -564,7 +565,7 @@ class FlappybirdGame {
     // Clamp to ensure min pipe visibility (0.03)
     final halfGap = config.gapSize / 2;
     final clampedY = gapCenterY.clamp(halfGap + 0.03, 1.0 - FlappybirdConfig.groundHeight - halfGap - 0.03);
-    return Pipe(x: x, gapCenterY: clampedY);
+    return Pipe(x: x, gapCenterY: clampedY, width: FlappybirdConfig.pipeWidth);
   }
 
   void update(double dt) {
@@ -585,7 +586,7 @@ class FlappybirdGame {
 
   void _updateReady(double dt) {
     _bobPhase += 3.0 * dt;
-    bird.y = 0.4 + sin(_bobPhase) * 0.02;
+    bird.y = 0.35 + sin(_bobPhase) * 0.02;
     bird.wingPhase += 10.0 * dt;
   }
 
@@ -646,8 +647,9 @@ class FlappybirdGame {
     // Distance score
     _rawScore += config.pipeSpeed * dt * 100;
 
-    // Scroll ground
+    // Scroll ground (modulo to prevent float overflow)
     ground.offsetX -= config.pipeSpeed * dt;
+    if (ground.offsetX < -1.0) ground.offsetX += 1.0;
 
     // Scroll clouds
     for (final cloud in clouds) {
@@ -680,20 +682,24 @@ class FlappybirdGame {
     return false;
   }
 
+  double _deadTimer = 0;
+
   void _die() {
     state = GameState.dead;
-    bird.velocity = 0;
+    bird.velocity = bird.velocity.clamp(0, config.maxVelocity);
+    _deadTimer = 0;
   }
 
   void _updateDead(double dt) {
     // Bird falls with gravity, rotation locked at 90 degrees
+    _deadTimer += dt;
     bird.velocity += config.gravity * dt;
     bird.velocity = bird.velocity.clamp(-config.maxVelocity, config.maxVelocity);
     bird.y += bird.velocity * dt;
     bird.rotation = pi / 2;
 
-    if (bird.y + bird.radius >= 1.0 - ground.height) {
-      bird.y = 1.0 - ground.height - bird.radius;
+    if (bird.y + bird.radius >= 1.0 - ground.height || _deadTimer >= 1.0) {
+      bird.y = (1.0 - ground.height - bird.radius).clamp(0, 1.0);
       state = GameState.gameOver;
     }
   }
@@ -800,7 +806,7 @@ class FlappybirdPainter extends CustomPainter {
           Paint()
             ..shader = LinearGradient(
               colors: [FlappybirdColors.pipeCapDark, FlappybirdColors.pipeCap],
-            ).createShader(Rect.fromLTWH(capX, 0, capW, capH)),
+            ).createShader(Rect.fromLTWH(capX, upperBottom - capH, capW, capH)),
         );
       }
 
@@ -1129,7 +1135,7 @@ class _FlappybirdPageState extends State<FlappybirdPage>
               ),
               GameOverAction(
                 label: 'Choose Mode',
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {}, // pop handled by game_over_page.dart
               ),
               GameOverAction(
                 label: 'Home',
@@ -1376,8 +1382,10 @@ Expected: All tests pass
 
 - [ ] **Step 3: Squash into single feature commit**
 
+Note: Before starting Task 1, record `BASE_HASH=$(git rev-parse HEAD)`. Use it here instead of counting commits.
+
 ```bash
-git reset --soft HEAD~8
+git reset --soft $BASE_HASH
 git commit -m "feat: add Flappy Bird game with 3 modes, parallax background, and physics engine"
 ```
 
