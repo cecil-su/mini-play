@@ -2,7 +2,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'flappybird_colors.dart';
-import 'flappybird_config.dart';
 import 'flappybird_game.dart';
 import 'flappybird_models.dart';
 
