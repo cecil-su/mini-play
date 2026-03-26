@@ -121,6 +121,7 @@ class _GameOfLifePageState extends State<GameOfLifePage>
     final dt = (elapsed - _lastElapsed).inMicroseconds / 1e6;
     _lastElapsed = elapsed;
     _accumulator += dt;
+    if (_accumulator > 1.0) _accumulator = 1.0; // Cap to prevent runaway after stalls
 
     final stepInterval =
         1.0 / GameOfLifeConfig.speedLevels[_speedIndex];
@@ -201,6 +202,7 @@ class _GameOfLifePageState extends State<GameOfLifePage>
     _game.evolve();
     _generationNotifier.value = _game.generation;
     _incrementPaint();
+    _checkPatternRecognition();
   }
 
   void _changeSpeed() {

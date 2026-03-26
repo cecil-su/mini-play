@@ -81,7 +81,7 @@ class GameOfLifePatterns {
       year: 1970,
       period: 1,
       description: '最简单的静物，由 4 个细胞组成的 2×2 方块。每个细胞恰好有 3 个邻居，因此永远稳定不变。',
-      normalizedHash: 0x62D9AA4E3B1C, // Pre-computed
+      normalizedHash: 0x5282C43D163E6,
     ),
     GameOfLifePattern(
       id: 'beehive',
@@ -96,7 +96,7 @@ class GameOfLifePatterns {
       year: 1970,
       period: 1,
       description: '第二常见的静物，外形像蜂巢。由 6 个细胞组成，在随机初始状态中出现频率仅次于方块。',
-      normalizedHash: 0x7A3E5C8D12F0,
+      normalizedHash: 0xDE6DB014D1E89,
     ),
     GameOfLifePattern(
       id: 'loaf',
@@ -111,7 +111,7 @@ class GameOfLifePatterns {
       year: 1970,
       period: 1,
       description: '一种不对称的 7 细胞静物，外形像一条面包。是第三常见的静物。',
-      normalizedHash: 0x4B2C6A9E7D01,
+      normalizedHash: 0x826A5DB7EB733,
     ),
     GameOfLifePattern(
       id: 'boat',
@@ -126,7 +126,7 @@ class GameOfLifePatterns {
       year: 1970,
       period: 1,
       description: '最小的不对称静物，由 5 个细胞组成。外形像一艘小船，在随机图案中经常出现。',
-      normalizedHash: 0x3D1E5F8A2B90,
+      normalizedHash: 0x1D04513040C3BA,
     ),
 
     // === Oscillators ===
@@ -143,7 +143,7 @@ class GameOfLifePatterns {
       year: 1970,
       period: 2,
       description: '最简单也最常见的振荡器。3 个细胞排成一行，下一代变为一列，如此反复。周期为 2。',
-      normalizedHash: 0x1A2B3C4D5E6F,
+      normalizedHash: 0x10EFE9E1329D51,
     ),
     GameOfLifePattern(
       id: 'toad',
@@ -158,7 +158,7 @@ class GameOfLifePatterns {
       year: 1970,
       period: 2,
       description: '一种周期 2 的振荡器，由 6 个细胞组成。两排各 3 个细胞错位排列，交替变化。',
-      normalizedHash: 0x5F6E7D8C9B0A,
+      normalizedHash: 0x165FC1A25F425A,
     ),
     GameOfLifePattern(
       id: 'beacon',
@@ -173,7 +173,7 @@ class GameOfLifePatterns {
       year: 1970,
       period: 2,
       description: '由两个对角放置的方块组成的周期 2 振荡器。中间的两个角细胞交替出现和消失，像灯塔闪烁。',
-      normalizedHash: 0x8A9B0C1D2E3F,
+      normalizedHash: 0xF92BF96E3B5CC,
     ),
     GameOfLifePattern(
       id: 'pulsar',
@@ -201,7 +201,7 @@ class GameOfLifePatterns {
       year: 1970,
       period: 3,
       description: '最常见的周期 3 振荡器，具有四重对称性。由 48 个细胞组成，是生命游戏中最优美的图案之一。',
-      normalizedHash: 0x2C3D4E5F6A7B,
+      normalizedHash: 0x1C62DC50487A5A,
     ),
     GameOfLifePattern(
       id: 'pentadecathlon',
@@ -221,7 +221,7 @@ class GameOfLifePatterns {
       period: 15,
       description:
           '已知最小的周期 15 振荡器，经过 15 代演化后回到初始状态。名字来源于它在一个阶段有 15 个活细胞。',
-      normalizedHash: 0x9B8A7C6D5E4F,
+      normalizedHash: 0x160AB4D7862226,
     ),
 
     // === Spaceships ===
@@ -240,7 +240,7 @@ class GameOfLifePatterns {
       speed: 'c/4',
       description:
           '生命游戏中最重要的图案之一。由 5 个细胞组成，每 4 代沿对角线方向移动一格。它是最小的飞船，也是构建复杂结构的基础组件。',
-      normalizedHash: 0xF0E1D2C3B4A5,
+      normalizedHash: 0x1CB497BEC4E67B,
     ),
     GameOfLifePattern(
       id: 'lwss',
@@ -262,7 +262,7 @@ class GameOfLifePatterns {
       speed: 'c/2',
       description:
           '轻量级宇宙飞船（Lightweight Spaceship），由 9 个细胞组成。每 4 代水平移动 2 格，是速度 c/2 的飞船。',
-      normalizedHash: 0xA5B4C3D2E1F0,
+      normalizedHash: 0x8249478050B06,
     ),
 
     // === Methuselahs ===
@@ -279,7 +279,7 @@ class GameOfLifePatterns {
       year: 1970,
       description:
           '最著名的长寿图案。仅 5 个细胞，却需要 1103 代才能稳定，最终产生 116 个活细胞和大量碎片。它证明了简单初始条件可以产生极其复杂的行为。',
-      normalizedHash: 0x6F7E8D9CAB01,
+      normalizedHash: 0x184E53EAAFADBF,
     ),
     GameOfLifePattern(
       id: 'diehard',
@@ -294,7 +294,7 @@ class GameOfLifePatterns {
       year: 1986,
       description:
           '一种特殊的长寿图案：7 个细胞经过 130 代演化后完全消失，没有留下任何存活细胞。这是一个"消亡型"图案的经典例子。',
-      normalizedHash: 0x0123456789AB,
+      normalizedHash: 0x55627A4D984A4,
     ),
     GameOfLifePattern(
       id: 'acorn',
@@ -308,7 +308,7 @@ class GameOfLifePatterns {
       discoverer: 'Charles Corderman',
       year: 1978,
       description: '由 7 个细胞组成的长寿图案，需要 5206 代才能稳定。最终产生 633 个活细胞，包括 13 个滑翔机。',
-      normalizedHash: 0xCDEF01234567,
+      normalizedHash: 0x11C332A5819DB7,
     ),
 
     // === Guns ===
@@ -345,7 +345,7 @@ class GameOfLifePatterns {
       period: 30,
       description:
           '第一个被发现的枪型图案，由 Bill Gosper 在 1970 年发现。它每 30 代产生一个滑翔机，证明了生命游戏中图案可以无限增长。这一发现解决了 Conway 的一个重要猜想。',
-      normalizedHash: 0x89ABCDEF0123,
+      normalizedHash: 0x8A56D96FCC574,
     ),
   ];
 

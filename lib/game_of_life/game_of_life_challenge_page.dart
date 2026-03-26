@@ -206,6 +206,7 @@ class _ChallengePlayViewState extends State<_ChallengePlayView>
   }
 
   void _onFinished() {
+    _ticker.stop();
     if (_runner.state == ChallengeState.success) {
       _saveScore();
     }
@@ -235,11 +236,13 @@ class _ChallengePlayViewState extends State<_ChallengePlayView>
   void _startRun() {
     _runner.start();
     _accumulator = 0;
+    if (!_ticker.isActive) _ticker.start();
     setState(() {});
   }
 
   void _reset() {
     _runner.reset();
+    if (!_ticker.isActive) _ticker.start();
     setState(() => _paintVersion++);
   }
 

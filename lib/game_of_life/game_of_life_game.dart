@@ -83,8 +83,8 @@ class GameOfLifeGame {
   // --- Core methods ---
 
   int cellAt(int x, int y) {
-    final wx = x % gridWidth;
-    final wy = y % gridHeight;
+    final wx = ((x % gridWidth) + gridWidth) % gridWidth;
+    final wy = ((y % gridHeight) + gridHeight) % gridHeight;
     return current[wy * gridWidth + wx];
   }
 
@@ -245,8 +245,8 @@ class GameOfLifeGame {
   /// FNV-1a normalized hash (coordinates relative to bounding box top-left).
   int computeStateHash() {
     if (isEmpty) return 0;
-    int hash = 0xcbf29ce484222325;
-    const int prime = 0x100000001b3;
+    int hash = 0x1CBFB28CE48422; // FNV offset basis truncated to 53-bit safe
+    const int prime = 0x1000193; // FNV-1a 32-bit prime (JS-safe)
 
     for (int y = minY; y <= maxY; y++) {
       final rowOff = y * gridWidth;

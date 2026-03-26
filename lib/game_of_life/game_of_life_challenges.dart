@@ -21,6 +21,7 @@ class ChallengeLevel {
   final List<int> starThresholds; // [3-star max, 2-star max, 1-star max]
   final String? hintPatternId;
   final List<String>? tutorialSteps;
+  final int? goalMultiplier; // For population goals: need N× initial cell count
 
   const ChallengeLevel({
     required this.id,
@@ -35,9 +36,11 @@ class ChallengeLevel {
     required this.starThresholds,
     this.hintPatternId,
     this.tutorialSteps,
+    this.goalMultiplier,
   });
 
   int calcStars(int userCellCount) {
+    assert(starThresholds.length == 3, 'starThresholds must have exactly 3 elements');
     if (userCellCount <= starThresholds[0]) return 3;
     if (userCellCount <= starThresholds[1]) return 2;
     if (userCellCount <= starThresholds[2]) return 1;
@@ -193,9 +196,10 @@ class ChallengeLevels {
       initialCells: {},
       lockedCells: {},
       goalType: ChallengeGoalType.population,
-      goalParam: 50, // checked at gen 50, need 3x initial
+      goalParam: 50,
       maxGenerations: 50,
       starThresholds: [5, 7, 10],
+      goalMultiplier: 3,
     ),
     ChallengeLevel(
       id: 13,

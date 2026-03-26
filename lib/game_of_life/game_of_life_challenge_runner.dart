@@ -117,10 +117,9 @@ class ChallengeRunner {
         return game.isEmpty;
       case ChallengeGoalType.population:
         if (game.generation >= level.goalParam) {
-          // For level 12, need 3x initial count
-          if (level.id == 12) {
+          if (level.goalMultiplier != null) {
             return game.aliveCellCount >=
-                (_initialCellCount + userCellCount) * 3;
+                (_initialCellCount + userCellCount) * level.goalMultiplier!;
           }
           return game.aliveCellCount >= level.goalParam;
         }
