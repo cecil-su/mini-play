@@ -104,6 +104,15 @@ class GameRegistry {
       hasModePage: true,
     ),
     GameInfo(
+      name: 'Fruit Catcher',
+      icon: Icons.shopping_basket,
+      description: 'Catch falling fruits, dodge bombs',
+      phase: 3,
+      route: '/fruit_catcher',
+      implemented: true,
+      hasModePage: true,
+    ),
+    GameInfo(
       name: 'Klotski',
       icon: Icons.view_compact,
       description: '华容道 - 滑动方块，释放曹操',

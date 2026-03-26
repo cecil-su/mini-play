@@ -23,6 +23,9 @@ import 'breakout/breakout_page.dart';
 import 'flappybird/flappybird_config.dart';
 import 'flappybird/flappybird_mode_page.dart';
 import 'flappybird/flappybird_page.dart';
+import 'fruit_catcher/fruit_catcher_config.dart';
+import 'fruit_catcher/fruit_catcher_mode_page.dart';
+import 'fruit_catcher/fruit_catcher_page.dart';
 import 'klotski/klotski_mode_page.dart';
 import 'klotski/klotski_page.dart';
 import 'tetris/tetris_board.dart';
@@ -170,6 +173,18 @@ class MiniPlayApp extends StatelessWidget {
             return MaterialPageRoute(
               settings: settings,
               builder: (_) => FlappybirdPage(mode: mode),
+            );
+          case '/fruit_catcher':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const FruitCatcherModePage(),
+            );
+          case '/fruit_catcher/play':
+            final mode = settings.arguments as FruitCatcherMode? ??
+                FruitCatcherMode.timed;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => FruitCatcherPage(mode: mode),
             );
           case '/klotski':
             return MaterialPageRoute(
