@@ -303,25 +303,4 @@ class GameOfLifeGame {
     if (y < minY) minY = y;
     if (y > maxY) maxY = y;
   }
-
-  /// Recalculate bounding box from scratch (call after removing cells).
-  void recalcBoundingBox() {
-    minX = gridWidth;
-    maxX = 0;
-    minY = gridHeight;
-    maxY = 0;
-    aliveCellCount = 0;
-    for (int y = 0; y < gridHeight; y++) {
-      final rowOff = y * gridWidth;
-      for (int x = 0; x < gridWidth; x++) {
-        if (current[rowOff + x] == 1) {
-          aliveCellCount++;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        }
-      }
-    }
-  }
 }

@@ -164,9 +164,9 @@ class _GameOfLifePageState extends State<GameOfLifePage>
 
     final idx = _game.matchKnownPattern(GameOfLifePatterns.allNormalizedHashes);
     if (idx != null && !_notifiedPatternIndices.contains(idx)) {
+      if (!mounted) return;
       _notifiedPatternIndices.add(idx);
       final pattern = GameOfLifePatterns.all[idx];
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('检测到图案: ${pattern.name} ${pattern.nameEn}'),
