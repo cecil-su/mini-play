@@ -121,6 +121,15 @@ class GameRegistry {
       implemented: true,
       hasModePage: true,
     ),
+    GameInfo(
+      name: 'Game of Life',
+      icon: Icons.grid_on,
+      description: '生命游戏 - 细胞自动机模拟器',
+      phase: 4,
+      route: '/gameoflife',
+      implemented: true,
+      hasModePage: true,
+    ),
   ];
 
   static List<GameInfo> byPhase(int phase) =>

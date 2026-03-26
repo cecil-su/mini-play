@@ -28,6 +28,11 @@ import 'fruit_catcher/fruit_catcher_mode_page.dart';
 import 'fruit_catcher/fruit_catcher_page.dart';
 import 'klotski/klotski_mode_page.dart';
 import 'klotski/klotski_page.dart';
+import 'game_of_life/game_of_life_mode_page.dart';
+import 'game_of_life/game_of_life_page.dart';
+import 'game_of_life/game_of_life_challenge_page.dart';
+import 'game_of_life/game_of_life_encyclopedia_page.dart';
+import 'game_of_life/game_of_life_patterns.dart';
 import 'tetris/tetris_board.dart';
 import 'tetris/tetris_mode_page.dart';
 import 'tetris/tetris_page.dart';
@@ -196,6 +201,29 @@ class MiniPlayApp extends StatelessWidget {
             return MaterialPageRoute(
               settings: settings,
               builder: (_) => KlotskiPage(levelIndex: levelIndex),
+            );
+          case '/gameoflife':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const GameOfLifeModePage(),
+            );
+          case '/gameoflife/sandbox':
+            final pattern = settings.arguments as GameOfLifePattern?;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => GameOfLifePage(initialPattern: pattern),
+            );
+          case '/gameoflife/challenge':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const GameOfLifeChallengePage(),
+            );
+          case '/gameoflife/encyclopedia':
+            final patternId = settings.arguments as String?;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) =>
+                  GameOfLifeEncyclopediaPage(initialPatternId: patternId),
             );
           default:
             return MaterialPageRoute(
