@@ -12,6 +12,7 @@ class GameScaffold extends StatefulWidget {
   final String Function(int)? scoreFormatter;
   final String Function(int)? bestFormatter;
   final bool Function()? canPause;
+  final Color Function(int score)? scoreColorBuilder;
 
   const GameScaffold({
     super.key,
@@ -26,6 +27,7 @@ class GameScaffold extends StatefulWidget {
     this.scoreFormatter,
     this.bestFormatter,
     this.canPause,
+    this.scoreColorBuilder,
   });
 
   @override
@@ -130,13 +132,15 @@ class _GameScaffoldState extends State<GameScaffold>
                 child: ValueListenableBuilder<int>(
                   valueListenable: widget.scoreNotifier,
                   builder: (context, score, _) {
+                    final scoreColor = widget.scoreColorBuilder?.call(score)
+                        ?? const Color(0xFF4ECCA3);
                     return Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           '${widget.scoreLabel}: ${widget.scoreFormatter?.call(score) ?? '$score'}',
-                          style: const TextStyle(
-                            color: Color(0xFF4ECCA3),
+                          style: TextStyle(
+                            color: scoreColor,
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),

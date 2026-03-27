@@ -1,5 +1,6 @@
 // lib/klotski/klotski_block_widget.dart
 
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'klotski_config.dart';
 import 'klotski_models.dart';
@@ -11,6 +12,9 @@ class KlotskiBlockWidget extends StatefulWidget {
   final int Function(Direction dir) maxDistance;
   final void Function(Direction dir, int distance) onMoved;
   final bool enabled;
+  final bool isSelected;
+  final bool isHinted;
+  final Direction? hintDirection;
 
   const KlotskiBlockWidget({
     required this.block,
@@ -18,6 +22,9 @@ class KlotskiBlockWidget extends StatefulWidget {
     required this.maxDistance,
     required this.onMoved,
     this.enabled = true,
+    this.isSelected = false,
+    this.isHinted = false,
+    this.hintDirection,
     super.key,
   });
 
@@ -26,9 +33,13 @@ class KlotskiBlockWidget extends StatefulWidget {
 }
 
 class _KlotskiBlockWidgetState extends State<KlotskiBlockWidget>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+    with TickerProviderStateMixin {
+  late AnimationController _snapController;
   late Animation<Offset> _snapAnimation;
+
+  // Hint pulse animation
+  late AnimationController _hintController;
+  late Animation<double> _hintPulse;
 
   Offset _dragOffset = Offset.zero;
   Axis? _lockedAxis;
@@ -38,16 +49,36 @@ class _KlotskiBlockWidgetState extends State<KlotskiBlockWidget>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _snapController = AnimationController(
       duration: const Duration(milliseconds: 150),
       vsync: this,
     );
     _snapAnimation = const AlwaysStoppedAnimation(Offset.zero);
+
+    _hintController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _hintPulse = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _hintController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void didUpdateWidget(KlotskiBlockWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isHinted && !oldWidget.isHinted) {
+      _hintController.repeat(reverse: true);
+    } else if (!widget.isHinted && oldWidget.isHinted) {
+      _hintController.stop();
+      _hintController.reset();
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _snapController.dispose();
+    _hintController.dispose();
     super.dispose();
   }
 
@@ -63,11 +94,10 @@ class _KlotskiBlockWidgetState extends State<KlotskiBlockWidget>
 
   void _onPanStart(DragStartDetails details) {
     if (!widget.enabled) return;
-    _controller.stop();
+    _snapController.stop();
     _isDragging = true;
     _dragOffset = Offset.zero;
     _lockedAxis = null;
-    // 缓存四方向最大距离
     _maxDistances = {
       for (final dir in Direction.values) dir: widget.maxDistance(dir),
     };
@@ -80,7 +110,7 @@ class _KlotskiBlockWidgetState extends State<KlotskiBlockWidget>
     final delta = details.delta;
     var newOffset = _dragOffset + delta;
 
-    // 轴锁定：>8px 后锁定
+    // Axis lock after >8px
     if (_lockedAxis == null) {
       if (newOffset.dx.abs() > 8 || newOffset.dy.abs() > 8) {
         _lockedAxis = newOffset.dx.abs() >= newOffset.dy.abs()
@@ -89,14 +119,13 @@ class _KlotskiBlockWidgetState extends State<KlotskiBlockWidget>
       }
     }
 
-    // 约束到锁定轴
     if (_lockedAxis == Axis.horizontal) {
       newOffset = Offset(newOffset.dx, 0);
     } else if (_lockedAxis == Axis.vertical) {
       newOffset = Offset(0, newOffset.dy);
     }
 
-    // 夹紧到 maxDistance 范围
+    // Clamp to maxDistance
     final cs = widget.cellSize;
     if (_lockedAxis == Axis.horizontal) {
       final maxRight = (_maxDistances[Direction.right] ?? 0) * cs;
@@ -140,7 +169,6 @@ class _KlotskiBlockWidgetState extends State<KlotskiBlockWidget>
     }
 
     if (dir != null && distance > 0) {
-      // 吸附动画到目标格
       final targetOffset = Offset(
         dir.dx * distance * cs,
         dir.dy * distance * cs,
@@ -149,31 +177,28 @@ class _KlotskiBlockWidgetState extends State<KlotskiBlockWidget>
         widget.onMoved(dir!, distance);
       });
     } else {
-      // 弹回原位
       _animateSnap(_dragOffset, Offset.zero, Curves.easeOut, null);
     }
   }
 
   void _animateSnap(Offset from, Offset to, Curve curve, VoidCallback? onDone) {
     _snapAnimation = Tween<Offset>(begin: from, end: to).animate(
-      CurvedAnimation(parent: _controller, curve: curve),
+      CurvedAnimation(parent: _snapController, curve: curve),
     );
-    _controller.reset();
-    _controller.duration = Duration(milliseconds: to == Offset.zero ? 100 : 150);
+    _snapController.reset();
+    _snapController.duration = Duration(milliseconds: to == Offset.zero ? 100 : 150);
 
     void listener(AnimationStatus status) {
       if (status == AnimationStatus.completed) {
-        _controller.removeStatusListener(listener);
-        if (onDone != null) {
-          onDone();
-        }
+        _snapController.removeStatusListener(listener);
+        if (onDone != null) onDone();
         setState(() {
           _snapAnimation = const AlwaysStoppedAnimation(Offset.zero);
         });
       }
     }
-    _controller.addStatusListener(listener);
-    _controller.forward();
+    _snapController.addStatusListener(listener);
+    _snapController.forward();
   }
 
   @override
@@ -182,10 +207,10 @@ class _KlotskiBlockWidgetState extends State<KlotskiBlockWidget>
     final block = widget.block;
     final blockWidth = block.width * cs;
     final blockHeight = block.height * cs;
-    final inset = 2.0;
+    const inset = 2.0;
 
     return AnimatedBuilder(
-      animation: _controller,
+      animation: Listenable.merge([_snapController, _hintController]),
       builder: (context, child) {
         return Transform.translate(
           offset: _currentOffset,
@@ -197,50 +222,134 @@ class _KlotskiBlockWidgetState extends State<KlotskiBlockWidget>
               width: blockWidth,
               height: blockHeight,
               child: Padding(
-                padding: EdgeInsets.all(inset),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: KlotskiColors.bgForType(block.type),
-                    borderRadius: BorderRadius.circular(4),
-                    boxShadow: _isDragging
-                        ? [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.4),
-                              blurRadius: 8,
-                              offset: const Offset(2, 4),
-                            ),
-                          ]
-                        : [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              blurRadius: 2,
-                              offset: const Offset(1, 2),
-                            ),
-                          ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      block.label,
-                      style: TextStyle(
-                        color: KlotskiColors.blockText,
-                        fontSize: cs * 0.4,
-                        fontWeight: FontWeight.bold,
-                        shadows: const [
-                          Shadow(
-                            color: KlotskiColors.blockTextShadow,
-                            blurRadius: 2,
-                            offset: Offset(1, 1),
+                padding: const EdgeInsets.all(inset),
+                child: Stack(
+                  children: [
+                    // Main block body
+                    Container(
+                      decoration: BoxDecoration(
+                        color: KlotskiColors.bgForType(block.type),
+                        borderRadius: BorderRadius.circular(4),
+                        border: _buildBorder(),
+                        boxShadow: _buildShadow(),
+                      ),
+                      child: Center(
+                        child: Text(
+                          block.label,
+                          style: TextStyle(
+                            color: KlotskiColors.blockText,
+                            fontSize: cs * 0.4,
+                            fontWeight: FontWeight.bold,
+                            shadows: const [
+                              Shadow(
+                                color: KlotskiColors.blockTextShadow,
+                                blurRadius: 2,
+                                offset: Offset(1, 1),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                    // Hint direction arrow overlay
+                    if (widget.isHinted && widget.hintDirection != null)
+                      Positioned.fill(
+                        child: _HintArrow(
+                          direction: widget.hintDirection!,
+                          pulse: _hintPulse.value,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Border? _buildBorder() {
+    if (widget.isHinted) {
+      final alpha = 0.5 + 0.5 * _hintPulse.value;
+      return Border.all(
+        color: const Color(0xFFF0C040).withValues(alpha: alpha),
+        width: 2.5,
+      );
+    }
+    if (widget.isSelected) {
+      return Border.all(
+        color: const Color(0xFF4ECCA3),
+        width: 2,
+      );
+    }
+    return null;
+  }
+
+  List<BoxShadow> _buildShadow() {
+    if (widget.isHinted) {
+      final alpha = 0.2 + 0.3 * _hintPulse.value;
+      return [
+        BoxShadow(
+          color: const Color(0xFFF0C040).withValues(alpha: alpha),
+          blurRadius: 12,
+          spreadRadius: 2,
+        ),
+      ];
+    }
+    if (_isDragging) {
+      return [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.4),
+          blurRadius: 8,
+          offset: const Offset(2, 4),
+        ),
+      ];
+    }
+    return [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.2),
+        blurRadius: 2,
+        offset: const Offset(1, 2),
+      ),
+    ];
+  }
+}
+
+/// Direction arrow overlay for hint system
+class _HintArrow extends StatelessWidget {
+  final Direction direction;
+  final double pulse;
+
+  const _HintArrow({required this.direction, required this.pulse});
+
+  @override
+  Widget build(BuildContext context) {
+    final angle = switch (direction) {
+      Direction.up => -math.pi / 2,
+      Direction.down => math.pi / 2,
+      Direction.left => math.pi,
+      Direction.right => 0.0,
+    };
+
+    // Arrow slides in the hint direction
+    final offset = Offset(
+      direction.dx * pulse * 6,
+      direction.dy * pulse * 6,
+    );
+
+    return Transform.translate(
+      offset: offset,
+      child: Center(
+        child: Transform.rotate(
+          angle: angle,
+          child: Icon(
+            Icons.arrow_forward_rounded,
+            color: Colors.white.withValues(alpha: 0.6 + 0.4 * pulse),
+            size: 24,
+          ),
+        ),
+      ),
     );
   }
 }
